@@ -3,3 +3,4 @@ intel-extension-for-pytorch==2.3.110+xpu
 torch==2.3.1+cxx11.abi
 oneccl_bind_pt==2.3.100+xpu
 optimum[openvino]
+transformers>=4.48.0 # not directly required, pinned by Snyk to avoid a vulnerability
