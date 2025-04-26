@@ -4,3 +4,4 @@ grpcio==1.68.1
 protobuf
 certifi
 transformers
+torch>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
