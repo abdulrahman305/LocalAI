@@ -5,3 +5,5 @@ oneccl_bind_pt==2.3.100+xpu
 optimum[openvino]
 intel-extension-for-transformers
 bitsandbytes
+setuptools>=78.1.1 # not directly required, pinned by Snyk to avoid a vulnerability
+transformers>=4.50.0 # not directly required, pinned by Snyk to avoid a vulnerability
