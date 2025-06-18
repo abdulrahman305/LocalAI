@@ -2,3 +2,4 @@ torch==2.4.1
 accelerate
 transformers
 bitsandbytes
+requests>=2.32.4 # not directly required, pinned by Snyk to avoid a vulnerability
