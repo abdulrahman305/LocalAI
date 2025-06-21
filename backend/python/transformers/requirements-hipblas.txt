@@ -3,3 +3,4 @@ torch==2.4.1+rocm6.0
 accelerate
 transformers
 bitsandbytes
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
