@@ -22,3 +22,5 @@ jieba==0.42.1
 langid==1.1.6
 git+https://github.com/myshell-ai/MeloTTS.git
 git+https://github.com/myshell-ai/OpenVoice.git
+aiohttp>=3.12.14 # not directly required, pinned by Snyk to avoid a vulnerability
+transformers>=4.52.0 # not directly required, pinned by Snyk to avoid a vulnerability
