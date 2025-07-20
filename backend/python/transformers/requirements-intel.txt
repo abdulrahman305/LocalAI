@@ -5,3 +5,4 @@ oneccl_bind_pt==2.3.100+xpu
 optimum[openvino]
 intel-extension-for-transformers
 bitsandbytes
+aiohttp>=3.12.14 # not directly required, pinned by Snyk to avoid a vulnerability
