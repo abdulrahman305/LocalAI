@@ -1,4 +1,51 @@
 ---
+- &ernie
+  url: "github:mudler/LocalAI/gallery/chatml.yaml@master"
+  name: "baidu_ernie-4.5-21b-a3b-thinking"
+  license: apache-2.0
+  tags:
+    - gguf
+    - GPU
+    - CPU
+    - text-to-text
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/64f187a2cc1c03340ac30498/TYYUxK8xD1AxExFMWqbZD.png
+  urls:
+    - https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking
+    - https://huggingface.co/bartowski/baidu_ERNIE-4.5-21B-A3B-Thinking-GGUF
+  description: |
+    Over the past three months, we have continued to scale the thinking capability of ERNIE-4.5-21B-A3B, improving both the quality and depth of reasoning, thereby advancing the competitiveness of ERNIE lightweight models in complex reasoning tasks. We are pleased to introduce ERNIE-4.5-21B-A3B-Thinking, featuring the following key enhancements:
+    Significantly improved performance on reasoning tasks, including logical reasoning, mathematics, science, coding, text generation, and academic benchmarks that typically require human expertise.
+    Efficient tool usage capabilities.
+    Enhanced 128K long-context understanding capabilities.
+    Note: This version has an increased thinking length. We strongly recommend its use in highly complex reasoning tasks. ERNIE-4.5-21B-A3B-Thinking is a text MoE post-trained model, with 21B total parameters and 3B activated parameters for each token.
+  overrides:
+    parameters:
+      model: baidu_ERNIE-4.5-21B-A3B-Thinking-Q4_K_M.gguf
+  files:
+    - filename: baidu_ERNIE-4.5-21B-A3B-Thinking-Q4_K_M.gguf
+      sha256: f309f225c413324c585e74ce28c55e76dec25340156374551d39707fc2966840
+      uri: huggingface://bartowski/baidu_ERNIE-4.5-21B-A3B-Thinking-GGUF/baidu_ERNIE-4.5-21B-A3B-Thinking-Q4_K_M.gguf
+- &mimo
+  license: mit
+  tags:
+    - gguf
+    - GPU
+    - CPU
+    - text-to-text
+  icon: https://cdn-uploads.huggingface.co/production/uploads/634262af8d8089ebaefd410e/9Bnn2AnIjfQFWBGkhDNmI.png
+  name: "aurore-reveil_koto-small-7b-it"
+  urls:
+    - https://huggingface.co/Aurore-Reveil/Koto-Small-7B-IT
+    - https://huggingface.co/bartowski/Aurore-Reveil_Koto-Small-7B-IT-GGUF
+  description: |
+    Koto-Small-7B-IT is an instruct-tuned version of Koto-Small-7B-PT, which was trained on MiMo-7B-Base for almost a billion tokens of creative-writing data. This model is meant for roleplaying and instruct usecases.
+  overrides:
+    parameters:
+      model: Aurore-Reveil_Koto-Small-7B-IT-Q4_K_M.gguf
+  files:
+    - filename: Aurore-Reveil_Koto-Small-7B-IT-Q4_K_M.gguf
+      sha256: c5c38bfa5d8d5100e91a2e0050a0b2f3e082cd4bfd423cb527abc3b6f1ae180c
+      uri: huggingface://bartowski/Aurore-Reveil_Koto-Small-7B-IT-GGUF/Aurore-Reveil_Koto-Small-7B-IT-Q4_K_M.gguf
 - &internvl35
   name: "opengvlab_internvl3_5-30b-a3b"
   url: "github:mudler/LocalAI/gallery/qwen3.yaml@master"
@@ -288,7 +335,7 @@
   url: "github:mudler/LocalAI/gallery/qwen-image.yaml@master"
   urls:
     - https://huggingface.co/Qwen/Qwen-Image-Edit
-  icon: https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-Image/qwen_image_logo.png
+  icon: https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-Image/qwen_image_edit_logo.png
   license: apache-2.0
   tags:
     - qwen-image
@@ -299,6 +346,26 @@
   overrides:
     parameters:
       model: Qwen/Qwen-Image-Edit
+    diffusers:
+      cuda: true
+      pipeline_type: QwenImageEditPipeline
+      enable_parameters: num_inference_steps,image
+- !!merge <<: *qwenimage
+  name: "qwen-image-edit-2509"
+  url: "github:mudler/LocalAI/gallery/qwen-image.yaml@master"
+  urls:
+    - https://huggingface.co/Qwen/Qwen-Image-Edit-2509
+  icon: https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-Image/qwen_image_edit_logo.png
+  license: apache-2.0
+  tags:
+    - qwen-image
+    - gpu
+    - image-to-image
+  description: |
+    Qwen-Image-Edit is a model for image editing, which is based on Qwen-Image.
+  overrides:
+    parameters:
+      model: Qwen/Qwen-Image-Edit-2509
     diffusers:
       cuda: true
       pipeline_type: QwenImageEditPipeline
@@ -2468,6 +2535,162 @@
     - filename: Qwen_Qwen3-4B-Thinking-2507-Q8_0.gguf
       sha256: 2c08db093bc57c2c77222d27ffe8d41cb0b5648e66ba84e5fb9ceab429f6735c
       uri: huggingface://bartowski/Qwen_Qwen3-4B-Thinking-2507-GGUF/Qwen_Qwen3-4B-Thinking-2507-Q8_0.gguf
+- !!merge <<: *qwen3
+  name: "nousresearch_hermes-4-14b"
+  icon: https://cdn-uploads.huggingface.co/production/uploads/6317aade83d8d2fd903192d9/7B7nMvHJiL72QzVBEPKOG.png
+  urls:
+    - https://huggingface.co/NousResearch/Hermes-4-14B
+    - https://huggingface.co/bartowski/NousResearch_Hermes-4-14B-GGUF
+  description: |
+    Hermes 4 14B is a frontier, hybrid-mode reasoning model based on Qwen 3 14B by Nous Research that is aligned to you.
+
+    Read the Hermes 4 technical report here: Hermes 4 Technical Report
+
+    Chat with Hermes in Nous Chat: https://chat.nousresearch.com
+
+    Training highlights include a newly synthesized post-training corpus emphasizing verified reasoning traces, massive improvements in math, code, STEM, logic, creativity, and format-faithful outputs, while preserving general assistant quality and broadly neutral alignment.
+    What’s new vs Hermes 3
+
+        Post-training corpus: Massively increased dataset size from 1M samples and 1.2B tokens to ~5M samples / ~60B tokens blended across reasoning and non-reasoning data.
+        Hybrid reasoning mode with explicit <think>…</think> segments when the model decides to deliberate, and options to make your responses faster when you want.
+        Reasoning that is top quality, expressive, improves math, code, STEM, logic, and even creative writing and subjective responses.
+        Schema adherence & structured outputs: trained to produce valid JSON for given schemas and to repair malformed objects.
+        Much easier to steer and align: extreme improvements on steerability, especially on reduced refusal rates.
+  overrides:
+    parameters:
+      model: NousResearch_Hermes-4-14B-Q4_K_M.gguf
+  files:
+    - filename: NousResearch_Hermes-4-14B-Q4_K_M.gguf
+      sha256: 7ad9be1e446e3da0c149fdf55284c90be666d3e13c6e2581587853f4f9538073
+      uri: huggingface://bartowski/NousResearch_Hermes-4-14B-GGUF/NousResearch_Hermes-4-14B-Q4_K_M.gguf
+- !!merge <<: *qwen3
+  name: "minicpm-v-4_5"
+  license: apache-2.0
+  icon: https://avatars.githubusercontent.com/u/89920203
+  urls:
+    - https://huggingface.co/openbmb/MiniCPM-V-4_5-gguf
+    - https://huggingface.co/openbmb/MiniCPM-V-4_5
+  description: |
+    MiniCPM-V 4.5 is the latest and most capable model in the MiniCPM-V series. The model is built on Qwen3-8B and SigLIP2-400M with a total of 8B parameters.
+  tags:
+    - llm
+    - multimodal
+    - gguf
+    - gpu
+    - qwen3
+    - cpu
+  overrides:
+    mmproj: minicpm-v-4_5-mmproj-f16.gguf
+    parameters:
+      model: minicpm-v-4_5-Q4_K_M.gguf
+  files:
+    - filename: minicpm-v-4_5-Q4_K_M.gguf
+      sha256: c1c3c33100b15b4caf7319acce4e23c0eb0ce1cbd12f70e8d24f05aa67b7512f
+      uri: huggingface://openbmb/MiniCPM-V-4_5-gguf/ggml-model-Q4_K_M.gguf
+    - filename: minicpm-v-4_5-mmproj-f16.gguf
+      uri: huggingface://openbmb/MiniCPM-V-4_5-gguf/mmproj-model-f16.gguf
+      sha256: 7a7225a32e8d453aaa3d22d8c579b5bf833c253f784cdb05c99c9a76fd616df8
+- !!merge <<: *qwen3
+  name: "aquif-ai_aquif-3.5-8b-think"
+  urls:
+    - https://huggingface.co/aquif-ai/aquif-3.5-8B-Think
+    - https://huggingface.co/bartowski/aquif-ai_aquif-3.5-8B-Think-GGUF
+  description: |
+    The aquif-3.5 series is the successor to aquif-3, featuring a simplified naming scheme, expanded Mixture of Experts (MoE) options, and across-the-board performance improvements. This release streamlines model selection while delivering enhanced capabilities across reasoning, multilingual support, and general intelligence tasks.
+    An experimental small-scale Mixture of Experts model designed for multilingual applications with minimal computational overhead. Despite its compact active parameter count, it demonstrates competitive performance against larger dense models.
+  overrides:
+    parameters:
+      model: aquif-ai_aquif-3.5-8B-Think-Q4_K_M.gguf
+  files:
+    - filename: aquif-ai_aquif-3.5-8B-Think-Q4_K_M.gguf
+      sha256: 9e49b9c840de23bb3eb181ba7a102706c120b3e3d006983c3f14ebae307ff02e
+      uri: huggingface://bartowski/aquif-ai_aquif-3.5-8B-Think-GGUF/aquif-ai_aquif-3.5-8B-Think-Q4_K_M.gguf
+- !!merge <<: *qwen3
+  name: "qwen3-stargate-sg1-uncensored-abliterated-8b-i1"
+  icon: https://huggingface.co/DavidAU/Qwen3-Stargate-SG1-Uncensored-Abliterated-8B/resolve/main/sg1.jpg
+  urls:
+    - https://huggingface.co/DavidAU/Qwen3-Stargate-SG1-Uncensored-Abliterated-8B
+    - https://huggingface.co/mradermacher/Qwen3-Stargate-SG1-Uncensored-Abliterated-8B-i1-GGUF
+  description: |
+    This repo contains the full precision source code, in "safe tensors" format to generate GGUFs, GPTQ, EXL2, AWQ, HQQ and other formats. The source code can also be used directly.
+
+    This model is specifically for SG1 (Stargate Series), science fiction, story generation (all genres) but also does coding and general tasks too.
+
+    This model can also be used for Role play.
+
+    This model will produce uncensored content (see notes below).
+
+    Fine tune (6 epochs, using Unsloth for Win 11) on an inhouse generated dataset to simulate / explore the Stargate SG1 Universe.
+
+    This version has the "canon" of all 10 seasons of SG1.
+
+    Model also contains, but not trained, on content from Stargate Atlantis, and Universe.
+
+    Fine tune process adds knowledge to the model, and alter all aspects of its operations.
+
+    Float32 (32 bit precision) was used to further increase the model's quality.
+
+    This model is based on "Goekdeniz-Guelmez/Josiefied-Qwen3-8B-abliterated-v1".
+
+    Example generations at the bottom of this page.
+
+    This is a Stargate (SG1) fine tune (1,331,953,664 of 9,522,689,024 (13.99% trained)), SIX epochs on this model.
+    As this is an instruct model, it will also benefit from a detailed system prompt too.
+  overrides:
+    parameters:
+      model: Qwen3-Stargate-SG1-Uncensored-Abliterated-8B.i1-Q4_K_M.gguf
+  files:
+    - filename: Qwen3-Stargate-SG1-Uncensored-Abliterated-8B.i1-Q4_K_M.gguf
+      sha256: 31ec697ccebbd7928c49714b8a0ec8be747be0f7c1ad71627967d2f8fe376990
+      uri: huggingface://mradermacher/Qwen3-Stargate-SG1-Uncensored-Abliterated-8B-i1-GGUF/Qwen3-Stargate-SG1-Uncensored-Abliterated-8B.i1-Q4_K_M.gguf
+- !!merge <<: *qwen3
+  url: "github:mudler/LocalAI/gallery/qwen3-deepresearch.yaml@master"
+  name: "alibaba-nlp_tongyi-deepresearch-30b-a3b"
+  urls:
+    - https://huggingface.co/Alibaba-NLP/Tongyi-DeepResearch-30B-A3B
+    - https://huggingface.co/bartowski/Alibaba-NLP_Tongyi-DeepResearch-30B-A3B-GGUF
+  description: |
+    We present Tongyi DeepResearch, an agentic large language model featuring 30 billion total parameters, with only 3 billion activated per token. Developed by Tongyi Lab, the model is specifically designed for long-horizon, deep information-seeking tasks. Tongyi-DeepResearch demonstrates state-of-the-art performance across a range of agentic search benchmarks, including Humanity's Last Exam, BrowserComp, BrowserComp-ZH, WebWalkerQA, GAIA, xbench-DeepSearch and FRAMES.
+  overrides:
+    parameters:
+      model: Alibaba-NLP_Tongyi-DeepResearch-30B-A3B-Q4_K_M.gguf
+  files:
+    - filename: Alibaba-NLP_Tongyi-DeepResearch-30B-A3B-Q4_K_M.gguf
+      sha256: 1afefb3b369ea2de191f24fe8ea22cbbb7b412357902f27bd81d693dde35c2d9
+      uri: huggingface://bartowski/Alibaba-NLP_Tongyi-DeepResearch-30B-A3B-GGUF/Alibaba-NLP_Tongyi-DeepResearch-30B-A3B-Q4_K_M.gguf
+- !!merge <<: *qwen3
+  name: "impish_qwen_14b-1m"
+  icon: https://huggingface.co/SicariusSicariiStuff/Impish_QWEN_14B-1M/resolve/main/Images/Impish_Qwen_14B.png
+  urls:
+    - https://huggingface.co/SicariusSicariiStuff/Impish_QWEN_14B-1M
+    - https://huggingface.co/mradermacher/Impish_QWEN_14B-1M-GGUF
+  description: |
+    Supreme context One million tokens to play with.
+    Strong Roleplay internet RP format lovers will appriciate it, medium size paragraphs.
+    Qwen smarts built-in, but naughty and playful Maybe it's even too naughty.
+    VERY compliant with low censorship.
+    VERY high IFeval for a 14B RP model: 78.68.
+  overrides:
+    parameters:
+      model: Impish_QWEN_14B-1M.Q4_K_M.gguf
+  files:
+    - filename: Impish_QWEN_14B-1M.Q4_K_M.gguf
+      sha256: d326f2b8f05814ea3943c82498f0cd3cde64859cf03f532855c87fb94b0da79e
+      uri: huggingface://mradermacher/Impish_QWEN_14B-1M-GGUF/Impish_QWEN_14B-1M.Q4_K_M.gguf
+- !!merge <<: *qwen3
+  name: "aquif-3.5-a4b-think"
+  urls:
+    - https://huggingface.co/aquif-ai/aquif-3.5-A4B-Think
+    - https://huggingface.co/QuantFactory/aquif-3.5-A4B-Think-GGUF
+  description: |
+    The aquif-3.5 series is the successor to aquif-3, featuring a simplified naming scheme, expanded Mixture of Experts (MoE) options, and across-the-board performance improvements. This release streamlines model selection while delivering enhanced capabilities across reasoning, multilingual support, and general intelligence tasks.
+  overrides:
+    parameters:
+      model: aquif-3.5-A4B-Think.Q4_K_M.gguf
+  files:
+    - filename: aquif-3.5-A4B-Think.Q4_K_M.gguf
+      sha256: 1650b72ae1acf12b45a702f2ff5f47205552e494f0d910e81cbe40dfba55a6b9
+      uri: huggingface://QuantFactory/aquif-3.5-A4B-Think-GGUF/aquif-3.5-A4B-Think.Q4_K_M.gguf
 - &gemma3
   url: "github:mudler/LocalAI/gallery/gemma.yaml@master"
   name: "gemma-3-27b-it"
@@ -4785,6 +5008,25 @@
     - filename: sophosympatheia_Strawberrylemonade-70B-v1.1-Q4_K_M.gguf
       sha256: f0ca05ca40b8133f2fd5c7ae2e5c42af9200f559e54f37b46a76146ba09fa422
       uri: huggingface://bartowski/sophosympatheia_Strawberrylemonade-70B-v1.1-GGUF/sophosympatheia_Strawberrylemonade-70B-v1.1-Q4_K_M.gguf
+- !!merge <<: *llama33
+  icon: https://huggingface.co/invisietch/L3.3-Ignition-v0.1-70B/resolve/main/header.png
+  name: "invisietch_l3.3-ignition-v0.1-70b"
+  urls:
+    - https://huggingface.co/invisietch/L3.3-Ignition-v0.1-70B
+    - https://huggingface.co/bartowski/invisietch_L3.3-Ignition-v0.1-70B-GGUF
+  description: |
+    Ignition v0.1 is a Llama 3.3-based model merge designed for creative roleplay and fiction writing purposes. The model underwent a multi-stage merge process designed to optimise for creative writing capability, minimising slop, and improving coherence when compared with its constituent models.
+
+    The model shows a preference for detailed character cards and is sensitive to detailed system prompting. If you want a specific behavior from the model, try prompting for it directly.
+
+    Inferencing has been tested at fp8 and fp16, and both are coherent up to ~64k context.
+  overrides:
+    parameters:
+      model: invisietch_L3.3-Ignition-v0.1-70B-Q4_K_M.gguf
+  files:
+    - filename: invisietch_L3.3-Ignition-v0.1-70B-Q4_K_M.gguf
+      sha256: 55fad5010cb16193ca05a90ef5a76d06de79cd5fd7d16ff474ca4ddb008dbe75
+      uri: huggingface://bartowski/invisietch_L3.3-Ignition-v0.1-70B-GGUF/invisietch_L3.3-Ignition-v0.1-70B-Q4_K_M.gguf
 - &rwkv
   url: "github:mudler/LocalAI/gallery/rwkv.yaml@master"
   name: "rwkv-6-world-7b"
@@ -7390,6 +7632,40 @@
     - filename: Qwentile2.5-32B-Instruct-Q4_K_M.gguf
       sha256: e476d6e3c15c78fc3f986d7ae8fa35c16116843827f2e6243c05767cef2f3615
       uri: huggingface://bartowski/Qwentile2.5-32B-Instruct-GGUF/Qwentile2.5-32B-Instruct-Q4_K_M.gguf
+- !!merge <<: *qwen25
+  name: "websailor-32b"
+  urls:
+    - https://huggingface.co/Alibaba-NLP/WebSailor-32B
+    - https://huggingface.co/mradermacher/WebSailor-32B-GGUF
+  description: |
+    WebSailor is a complete post-training methodology designed to teach LLM agents sophisticated reasoning for complex web navigation and information-seeking tasks. It addresses the challenge of extreme uncertainty in vast information landscapes, a capability where previous open-source models lagged behind proprietary systems.
+    We classify information-seeking tasks into three difficulty levels, where Level 3 represents problems with both high uncertainty and a complex, non-linear path to a solution. To generate these challenging tasks, we introduce SailorFog-QA, a novel data synthesis pipeline that constructs intricate knowledge graphs and then applies information obfuscation. This process creates questions with high initial uncertainty that demand creative exploration and transcend simple, structured reasoning patterns.
+    Our training process begins by generating expert trajectories and then reconstructing the reasoning to create concise, action-oriented supervision signals, avoiding the stylistic and verbosity issues of teacher models. The agent is first given a "cold start" using rejection sampling fine-tuning (RFT) on a small set of high-quality examples to establish a baseline capability. This is followed by an efficient agentic reinforcement learning stage using our Duplicating Sampling Policy Optimization (DUPO) algorithm, which refines the agent's exploratory strategies.
+    WebSailor establishes a new state-of-the-art for open-source agents, achieving outstanding results on difficult benchmarks like BrowseComp-en and BrowseComp-zh. Notably, our smaller models like WebSailor-7B outperform agents built on much larger backbones, highlighting the efficacy of our training paradigm. Ultimately, WebSailor closes the performance gap to proprietary systems, achieving results on par with agents like Doubao-Search.
+  overrides:
+    parameters:
+      model: WebSailor-32B.Q4_K_M.gguf
+  files:
+    - filename: WebSailor-32B.Q4_K_M.gguf
+      sha256: 60cea732b8314cedf1807530857b4ebd9f6c41431b3223384eb7f94fbff7b5bc
+      uri: huggingface://mradermacher/WebSailor-32B-GGUF/WebSailor-32B.Q4_K_M.gguf
+- !!merge <<: *qwen25
+  name: "websailor-7b"
+  urls:
+    - https://huggingface.co/Alibaba-NLP/WebSailor-7B
+    - https://huggingface.co/mradermacher/WebSailor-7B-GGUF
+  description: |
+    WebSailor is a complete post-training methodology designed to teach LLM agents sophisticated reasoning for complex web navigation and information-seeking tasks. It addresses the challenge of extreme uncertainty in vast information landscapes, a capability where previous open-source models lagged behind proprietary systems.
+    We classify information-seeking tasks into three difficulty levels, where Level 3 represents problems with both high uncertainty and a complex, non-linear path to a solution. To generate these challenging tasks, we introduce SailorFog-QA, a novel data synthesis pipeline that constructs intricate knowledge graphs and then applies information obfuscation. This process creates questions with high initial uncertainty that demand creative exploration and transcend simple, structured reasoning patterns.
+    Our training process begins by generating expert trajectories and then reconstructing the reasoning to create concise, action-oriented supervision signals, avoiding the stylistic and verbosity issues of teacher models. The agent is first given a "cold start" using rejection sampling fine-tuning (RFT) on a small set of high-quality examples to establish a baseline capability. This is followed by an efficient agentic reinforcement learning stage using our Duplicating Sampling Policy Optimization (DUPO) algorithm, which refines the agent's exploratory strategies.
+    WebSailor establishes a new state-of-the-art for open-source agents, achieving outstanding results on difficult benchmarks like BrowseComp-en and BrowseComp-zh. Notably, our smaller models like WebSailor-7B outperform agents built on much larger backbones, highlighting the efficacy of our training paradigm. Ultimately, WebSailor closes the performance gap to proprietary systems, achieving results on par with agents like Doubao-Search.
+  overrides:
+    parameters:
+      model: WebSailor-7B.Q4_K_M.gguf
+  files:
+    - filename: WebSailor-7B.Q4_K_M.gguf
+      sha256: 6ede884af5d82176606c3af19a5cc90da6fdf81a520f54284084f5e012217a56
+      uri: huggingface://mradermacher/WebSailor-7B-GGUF/WebSailor-7B.Q4_K_M.gguf
 - &archfunct
   license: apache-2.0
   tags:
@@ -9789,6 +10065,119 @@
     - filename: baichuan-inc_Baichuan-M2-32B-Q4_K_M.gguf
       sha256: 51907419518e6f79c28f75e4097518e54c2efecd85cb4c714334395fa2d591c2
       uri: huggingface://bartowski/baichuan-inc_Baichuan-M2-32B-GGUF/baichuan-inc_Baichuan-M2-32B-Q4_K_M.gguf
+- !!merge <<: *qwen25
+  name: "k2-think-i1"
+  icon: https://huggingface.co/LLM360/K2-Think/resolve/main/banner.png
+  urls:
+    - https://huggingface.co/LLM360/K2-Think
+    - https://huggingface.co/mradermacher/K2-Think-i1-GGUF
+  description: |
+    K2-Think is a 32 billion parameter open-weights general reasoning model with strong performance in competitive mathematical problem solving.
+  overrides:
+    parameters:
+      model: K2-Think.i1-Q4_K_M.gguf
+  files:
+    - filename: K2-Think.i1-Q4_K_M.gguf
+      sha256: 510fad18b0cf58059437338c1b5b982996ef89456a8d88da52eb3d50fe78b9fd
+      uri: huggingface://mradermacher/K2-Think-i1-GGUF/K2-Think.i1-Q4_K_M.gguf
+- !!merge <<: *qwen25
+  name: "holo1.5-72b"
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/677d3f355f847864bb644112/OQyAJ33sssiTDIQEQ7oH_.png
+  urls:
+    - https://huggingface.co/Hcompany/Holo1.5-72B
+    - https://huggingface.co/mradermacher/Holo1.5-72B-GGUF
+  description: |
+    Computer Use (CU) agents are AI systems that can interact with real applications—web, desktop, and mobile—on behalf of a user. They can navigate interfaces, manipulate elements, and answer questions about content, enabling powerful automation and productivity tools. CU agents are becoming increasingly important as they allow humans to delegate complex digital tasks safely and efficiently.
+    The Holo1.5 series provides state-of-the-art foundational models for building such agents. Holo1.5 models excel at user interface (UI) localization and UI-based question answering (QA) across web, computer, and mobile environments, with strong performance on benchmarks including Screenspot-V2, Screenspot-Pro, GroundUI-Web, Showdown, and our newly introduced WebClick.
+  overrides:
+    mmproj: Holo1.5-72B.mmproj-Q8_0.gguf
+    parameters:
+      model: Holo1.5-72B.Q4_K_M.gguf
+  files:
+    - filename: Holo1.5-72B.Q4_K_M.gguf
+      sha256: 3404347c245fefa352a3dc16134b5870f594ab8bff11e50582205b5538201a23
+      uri: huggingface://mradermacher/Holo1.5-72B-GGUF/Holo1.5-72B.Q4_K_M.gguf
+    - filename: Holo1.5-72B.mmproj-Q8_0.gguf
+      sha256: f172cffc96a00d4f885eecffbc798912d37105f4191ba16a9947a5776b0f8a02
+      uri: huggingface://mradermacher/Holo1.5-72B-GGUF/Holo1.5-72B.mmproj-Q8_0.gguf
+- !!merge <<: *qwen25
+  name: "holo1.5-7b"
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/677d3f355f847864bb644112/OQyAJ33sssiTDIQEQ7oH_.png
+  urls:
+    - https://huggingface.co/Hcompany/Holo1.5-7B
+    - https://huggingface.co/mradermacher/Holo1.5-7B-GGUF
+  description: |
+    Computer Use (CU) agents are AI systems that can interact with real applications—web, desktop, and mobile—on behalf of a user. They can navigate interfaces, manipulate elements, and answer questions about content, enabling powerful automation and productivity tools. CU agents are becoming increasingly important as they allow humans to delegate complex digital tasks safely and efficiently.
+    The Holo1.5 series provides state-of-the-art foundational models for building such agents. Holo1.5 models excel at user interface (UI) localization and UI-based question answering (QA) across web, computer, and mobile environments, with strong performance on benchmarks including Screenspot-V2, Screenspot-Pro, GroundUI-Web, Showdown, and our newly introduced WebClick.
+  overrides:
+    mmproj: Holo1.5-7B.mmproj-Q8_0.gguf
+    parameters:
+      model: Holo1.5-7B.Q4_K_M.gguf
+  files:
+    - filename: Holo1.5-7B.Q4_K_M.gguf
+      sha256: 37d1c060b73b783ffdab8d70fa47a6cff46cd34b1cf44b5bfbf4f20ff99eacdd
+      uri: huggingface://mradermacher/Holo1.5-7B-GGUF/Holo1.5-7B.Q4_K_M.gguf
+    - filename: Holo1.5-7B.mmproj-Q8_0.gguf
+      sha256: a9bad2d3d9241251b8753d9be4ea737c03197077d96153c1365a62db709489f6
+      uri: huggingface://mradermacher/Holo1.5-7B-GGUF/Holo1.5-7B.mmproj-Q8_0.gguf
+- !!merge <<: *qwen25
+  name: "holo1.5-3b"
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/677d3f355f847864bb644112/OQyAJ33sssiTDIQEQ7oH_.png
+  urls:
+    - https://huggingface.co/Hcompany/Holo1.5-3B
+    - https://huggingface.co/mradermacher/Holo1.5-3B-GGUF
+  description: |
+    Computer Use (CU) agents are AI systems that can interact with real applications—web, desktop, and mobile—on behalf of a user. They can navigate interfaces, manipulate elements, and answer questions about content, enabling powerful automation and productivity tools. CU agents are becoming increasingly important as they allow humans to delegate complex digital tasks safely and efficiently.
+    The Holo1.5 series provides state-of-the-art foundational models for building such agents. Holo1.5 models excel at user interface (UI) localization and UI-based question answering (QA) across web, computer, and mobile environments, with strong performance on benchmarks including Screenspot-V2, Screenspot-Pro, GroundUI-Web, Showdown, and our newly introduced WebClick.
+  overrides:
+    mmproj: Holo1.5-3B.mmproj-Q8_0.gguf
+    parameters:
+      model: Holo1.5-3B.Q4_K_M.gguf
+  files:
+    - filename: Holo1.5-3B.Q4_K_M.gguf
+      sha256: 5efb1318d439fe1f71e38825a17203c48ced7de4a5d0796427c8c638e817622a
+      uri: huggingface://mradermacher/Holo1.5-3B-GGUF/Holo1.5-3B.Q4_K_M.gguf
+    - filename: Holo1.5-3B.mmproj-Q8_0.gguf
+      sha256: fb5cc798b386a4b680c306f061457cb16cc627c7d9ed401d660b8b940463142b
+      uri: huggingface://mradermacher/Holo1.5-3B-GGUF/Holo1.5-3B.mmproj-Q8_0.gguf
+- !!merge <<: *qwen25
+  name: "webwatcher-7b"
+  icon: https://huggingface.co/Alibaba-NLP/WebWatcher-7B/resolve/main/assets/webwatcher_logo.png
+  urls:
+    - https://huggingface.co/Alibaba-NLP/WebWatcher-7B
+    - https://huggingface.co/mradermacher/WebWatcher-7B-GGUF
+  description: |
+      WebWatcher is a multimodal agent for deep research that possesses enhanced visual-language reasoning capabilities. Our work presents a unified framework that combines complex vision-language reasoning with multi-tool interaction.
+  overrides:
+    mmproj: WebWatcher-7B.mmproj-Q8_0.gguf
+    parameters:
+      model: WebWatcher-7B.Q4_K_M.gguf
+  files:
+    - filename: WebWatcher-7B.Q4_K_M.gguf
+      sha256: 300c76a51de59552f997ee7ee78ec519620931dea15c655111633b96de1a47f2
+      uri: huggingface://mradermacher/WebWatcher-7B-GGUF/WebWatcher-7B.Q4_K_M.gguf
+    - filename: WebWatcher-7B.mmproj-Q8_0.gguf
+      sha256: 841dc1bcc4f69ca864518d2c9a9a37b1815169d9bd061b054e091061124e4e62
+      uri: huggingface://mradermacher/WebWatcher-7B-GGUF/WebWatcher-7B.mmproj-Q8_0.gguf
+- !!merge <<: *qwen25
+  name: "webwatcher-32b"
+  icon: https://huggingface.co/Alibaba-NLP/WebWatcher-32B/resolve/main/assets/webwatcher_logo.png
+  urls:
+    - https://huggingface.co/Alibaba-NLP/WebWatcher-32B
+    - https://huggingface.co/mradermacher/WebWatcher-32B-GGUF
+  description: |
+      WebWatcher is a multimodal agent for deep research that possesses enhanced visual-language reasoning capabilities. Our work presents a unified framework that combines complex vision-language reasoning with multi-tool interaction.
+  overrides:
+    mmproj: WebWatcher-32B.mmproj-Q8_0.gguf
+    parameters:
+      model: WebWatcher-32B.Q4_K_M.gguf
+  files:
+    - filename: WebWatcher-32B.Q4_K_M.gguf
+      sha256: 6cd51d97b9451759a4ce4ec0c2048b36ff99fd9f83bb32cd9f06af6c5438c69b
+      uri: huggingface://mradermacher/WebWatcher-32B-GGUF/WebWatcher-32B.Q4_K_M.gguf
+    - filename: WebWatcher-32B.mmproj-Q8_0.gguf
+      sha256: e8815515f71a959465cc62e08e0ef45d7d8592215139b34efece848552cb2327
+      uri: huggingface://mradermacher/WebWatcher-32B-GGUF/WebWatcher-32B.mmproj-Q8_0.gguf
 - &llama31
   url: "github:mudler/LocalAI/gallery/llama3.1-instruct.yaml@master" ## LLama3.1
   icon: https://avatars.githubusercontent.com/u/153379578
@@ -12284,6 +12673,34 @@
     - filename: Wingless_Imp_8B.i1-Q4_K_M.gguf
       sha256: 3a5ff776ab3286f43937c3c2d8e2e1e09c5ea1c91a79945c34ec071e23f31e3b
       uri: huggingface://mradermacher/Wingless_Imp_8B-i1-GGUF/Wingless_Imp_8B.i1-Q4_K_M.gguf
+- !!merge <<: *llama31
+  name: "nousresearch_hermes-4-70b"
+  icon: https://cdn-uploads.huggingface.co/production/uploads/6317aade83d8d2fd903192d9/roT9o5bMYBtQziRMlaSDf.jpeg
+  urls:
+    - https://huggingface.co/NousResearch/Hermes-4-70B
+    - https://huggingface.co/bartowski/NousResearch_Hermes-4-70B-GGUF
+  description: |
+    Hermes 4 70B is a frontier, hybrid-mode reasoning model based on Llama-3.1-70B by Nous Research that is aligned to you.
+
+    Read the Hermes 4 technical report here: Hermes 4 Technical Report
+
+    Chat with Hermes in Nous Chat: https://chat.nousresearch.com
+
+    Training highlights include a newly synthesized post-training corpus emphasizing verified reasoning traces, massive improvements in math, code, STEM, logic, creativity, and format-faithful outputs, while preserving general assistant quality and broadly neutral alignment.
+    What’s new vs Hermes 3
+
+        Post-training corpus: Massively increased dataset size from 1M samples and 1.2B tokens to ~5M samples / ~60B tokens blended across reasoning and non-reasoning data.
+        Hybrid reasoning mode with explicit <think>…</think> segments when the model decides to deliberate, and options to make your responses faster when you want.
+        Reasoning that is top quality, expressive, improves math, code, STEM, logic, and even creative writing and subjective responses.
+        Schema adherence & structured outputs: trained to produce valid JSON for given schemas and to repair malformed objects.
+        Much easier to steer and align: extreme improvements on steerability, especially on reduced refusal rates.
+  overrides:
+    parameters:
+      model: NousResearch_Hermes-4-70B-Q4_K_M.gguf
+  files:
+    - filename: NousResearch_Hermes-4-70B-Q4_K_M.gguf
+      sha256: ab9b59dd1df27c039952915aa4669a82b5f45e5e9532b98679c65dffe2fe9ee2
+      uri: huggingface://bartowski/NousResearch_Hermes-4-70B-GGUF/NousResearch_Hermes-4-70B-Q4_K_M.gguf
 - &deepseek
   url: "github:mudler/LocalAI/gallery/deepseek.yaml@master" ## Deepseek
   name: "deepseek-coder-v2-lite-instruct"
@@ -14811,6 +15228,27 @@
     - filename: Impish_Longtail_12B-Q4_K_M.gguf
       sha256: 2cf0cacb65d71cfc5b4255f3273ad245bbcb11956a0f9e3aaa0e739df57c90df
       uri: huggingface://SicariusSicariiStuff/Impish_Longtail_12B_GGUF/Impish_Longtail_12B-Q4_K_M.gguf
+- !!merge <<: *mistral03
+  name: "mistralai_magistral-small-2509"
+  urls:
+    - https://huggingface.co/mistralai/Magistral-Small-2509
+    - https://huggingface.co/bartowski/mistralai_Magistral-Small-2509-GGUF
+  description: |
+    Magistral Small 1.2
+    Building upon Mistral Small 3.2 (2506), with added reasoning capabilities, undergoing SFT from Magistral Medium traces and RL on top, it's a small, efficient reasoning model with 24B parameters.
+
+    Magistral Small can be deployed locally, fitting within a single RTX 4090 or a 32GB RAM MacBook once quantized.
+
+    Learn more about Magistral in our blog post.
+
+    The model was presented in the paper Magistral.
+  overrides:
+    parameters:
+      model: mistralai_Magistral-Small-2509-Q4_K_M.gguf
+  files:
+    - filename: mistralai_Magistral-Small-2509-Q4_K_M.gguf
+      sha256: 1d638bc931de30d29fc73ad439206ff185f76666a096e7ad723866a20f78728d
+      uri: huggingface://bartowski/mistralai_Magistral-Small-2509-GGUF/mistralai_Magistral-Small-2509-Q4_K_M.gguf
 - &mudler
   url: "github:mudler/LocalAI/gallery/mudler.yaml@master" ### START mudler's LocalAI specific-models
   name: "LocalAI-llama3-8b-function-call-v0.2"
@@ -19972,9 +20410,9 @@
     - https://huggingface.co/ggerganov/whisper.cpp
   overrides:
     parameters:
-      model: ggml-whisper-base.bin
+      model: ggml-base.bin
   files:
-    - filename: "ggml-whisper-base.bin"
+    - filename: "ggml-base.bin"
       sha256: "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
       uri: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
   description: |
@@ -19983,146 +20421,200 @@
   name: "whisper-base-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-base-q5_1.bin
+      model: ggml-base-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-base-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-base-q5_1.bin"
+    - filename: "ggml-base-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-base-q5_1.bin"
       sha256: 422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
 - !!merge <<: *whisper
   name: "whisper-base"
   overrides:
     parameters:
-      model: ggml-model-whisper-base.bin
+      model: ggml-base.bin
   files:
-    - filename: "ggml-model-whisper-base.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-base.bin"
+    - filename: "ggml-base.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-base.bin"
       sha256: 60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
 - !!merge <<: *whisper
   name: "whisper-base-en-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-base.en-q5_1.bin
+      model: ggml-base.en-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-base.en-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-base.en-q5_1.bin"
+    - filename: "ggml-base.en-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-base.en-q5_1.bin"
       sha256: 4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f
 - !!merge <<: *whisper
   name: "whisper-base-en"
   overrides:
     parameters:
-      model: ggml-model-whisper-base.en.bin
+      model: ggml-base.en.bin
   files:
-    - filename: "ggml-model-whisper-base.en.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-base.en.bin"
+    - filename: "ggml-base.en.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-base.en.bin"
       sha256: a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002
 - !!merge <<: *whisper
   name: "whisper-large-q5_0"
   overrides:
     parameters:
-      model: ggml-model-whisper-large-q5_0.bin
+      model: ggml-large-v3-q5_0.bin
   files:
-    - filename: "ggml-model-whisper-large-q5_0.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-large-q5_0.bin"
-      sha256: 3a214837221e4530dbc1fe8d734f302af393eb30bd0ed046042ebf4baf70f6f2
+    - filename: "ggml-large-v3-q5_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3-q5_0.bin"
+      sha256: d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1
+- !!merge <<: *whisper
+  name: "whisper-medium"
+  overrides:
+    parameters:
+      model: ggml-medium.bin
+  files:
+    - filename: "ggml-medium.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-medium.bin"
+      sha256: 6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208
 - !!merge <<: *whisper
   name: "whisper-medium-q5_0"
   overrides:
     parameters:
-      model: ggml-model-whisper-medium-q5_0.bin
+      model: ggml-medium-q5_0.bin
   files:
-    - filename: "ggml-model-whisper-medium-q5_0.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-medium-q5_0.bin"
+    - filename: "ggml-medium-q5_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-medium-q5_0.bin"
       sha256: 19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f
 - !!merge <<: *whisper
   name: "whisper-small-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-small-q5_1.bin
+      model: ggml-small-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-small-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-small-q5_1.bin"
+    - filename: "ggml-small-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-small-q5_1.bin"
       sha256: ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb
 - !!merge <<: *whisper
   name: "whisper-small"
   overrides:
     parameters:
-      model: ggml-model-whisper-small.bin
+      model: ggml-small.bin
   files:
-    - filename: "ggml-model-whisper-small.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-small.bin"
+    - filename: "ggml-small.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-small.bin"
       sha256: 1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b
 - !!merge <<: *whisper
   name: "whisper-small-en-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-small.en-q5_1.bin
+      model: ggml-small.en-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-small.en-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-small.en-q5_1.bin"
+    - filename: "ggml-small.en-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-small.en-q5_1.bin"
       sha256: bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30
 - !!merge <<: *whisper
   name: "whisper-small"
   overrides:
     parameters:
-      model: ggml-model-whisper-small.en.bin
+      model: ggml-small.en.bin
   files:
-    - filename: "ggml-model-whisper-small.en.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-small.en.bin"
+    - filename: "ggml-small.en.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-small.en.bin"
       sha256: c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d
 - !!merge <<: *whisper
   name: "whisper-small-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-small-q5_1.bin
+      model: ggml-small-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-small-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-small-q5_1.bin"
+    - filename: "ggml-small-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-small-q5_1.bin"
       sha256: ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb
 - !!merge <<: *whisper
   name: "whisper-tiny"
   overrides:
     parameters:
-      model: ggml-model-whisper-tiny.bin
+      model: ggml-tiny.bin
   files:
-    - filename: "ggml-model-whisper-tiny.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-tiny.bin"
+    - filename: "ggml-tiny.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-tiny.bin"
       sha256: be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
 - !!merge <<: *whisper
   name: "whisper-tiny-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-tiny-q5_1.bin
+      model: ggml-tiny-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-tiny-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-tiny-q5_1.bin"
+    - filename: "ggml-tiny-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-tiny-q5_1.bin"
       sha256: 818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7
 - !!merge <<: *whisper
   name: "whisper-tiny-en-q5_1"
   overrides:
     parameters:
-      model: ggml-model-whisper-tiny.en-q5_1.bin
+      model: ggml-tiny.en-q5_1.bin
   files:
-    - filename: "ggml-model-whisper-tiny.en-q5_1.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-tiny.en-q5_1.bin"
+    - filename: "ggml-tiny.en-q5_1.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-tiny.en-q5_1.bin"
       sha256: c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b
 - !!merge <<: *whisper
   name: "whisper-tiny-en"
   overrides:
     parameters:
-      model: ggml-model-whisper-tiny.en.bin
+      model: ggml-tiny.en.bin
   files:
-    - filename: "ggml-model-whisper-tiny.en.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-tiny.en.bin"
+    - filename: "ggml-tiny.en.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-tiny.en.bin"
       sha256: 921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f
 - !!merge <<: *whisper
   name: "whisper-tiny-en-q8_0"
   overrides:
     parameters:
-      model: ggml-model-whisper-tiny.en-q8_0.bin
+      model: ggml-tiny.en-q8_0.bin
   files:
-    - filename: "ggml-model-whisper-tiny.en-q8_0.bin"
-      uri: "https://ggml.ggerganov.com/ggml-model-whisper-tiny.en-q8_0.bin"
+    - filename: "ggml-tiny.en-q8_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-tiny.en-q8_0.bin"
       sha256: 5bc2b3860aa151a4c6e7bb095e1fcce7cf12c7b020ca08dcec0c6d018bb7dd94
+- !!merge <<: *whisper
+  name: "whisper-large"
+  overrides:
+    parameters:
+      model: ggml-large-v3.bin
+  files:
+    - filename: "ggml-large-v3.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3.bin"
+      sha256: 64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2
+- !!merge <<: *whisper
+  name: "whisper-large-q5_0"
+  overrides:
+    parameters:
+      model: ggml-large-v3-q5_0.bin
+  files:
+    - filename: "ggml-large-v3-q5_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3-q5_0.bin"
+      sha256: d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1
+- !!merge <<: *whisper
+  name: "whisper-large-turbo"
+  overrides:
+    parameters:
+      model: ggml-large-v3-turbo.bin
+  files:
+    - filename: "ggml-large-v3-turbo.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3-turbo.bin"
+      sha256: 1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69
+- !!merge <<: *whisper
+  name: "whisper-large-turbo-q5_0"
+  overrides:
+    parameters:
+      model: ggml-large-v3-turbo-q5_0.bin
+  files:
+    - filename: "ggml-large-v3-turbo-q5_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3-turbo-q5_0.bin"
+      sha256: 394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2
+- !!merge <<: *whisper
+  name: "whisper-large-turbo-q8_0"
+  overrides:
+    parameters:
+      model: ggml-large-v3-turbo-q8_0.bin
+  files:
+    - filename: "ggml-large-v3-turbo-q8_0.bin"
+      uri: "huggingface://ggerganov/whisper.cpp/ggml-large-v3-turbo-q8_0.bin"
+      sha256: 317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1
 ## Bert embeddings (llama3.2 drop-in)
 - !!merge <<: *llama32
   name: "bert-embeddings"

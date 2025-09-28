@@ -117,8 +117,8 @@ run: ## run local-ai
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" $(GOCMD) run ./
 
 test-models/testmodel.ggml:
-	mkdir test-models
-	mkdir test-dir
+	mkdir -p test-models
+	mkdir -p test-dir
 	wget -q https://huggingface.co/mradermacher/gpt2-alpaca-gpt4-GGUF/resolve/main/gpt2-alpaca-gpt4.Q4_K_M.gguf -O test-models/testmodel.ggml
 	wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin -O test-models/whisper-en
 	wget -q https://huggingface.co/mudler/all-MiniLM-L6-v2/resolve/main/ggml-model-q4_0.bin -O test-models/bert
@@ -369,12 +369,18 @@ backends/kitten-tts: docker-build-kitten-tts docker-save-kitten-tts build
 backends/kokoro: docker-build-kokoro docker-save-kokoro build
 	./local-ai backends install "ocifile://$(abspath ./backend-images/kokoro.tar)"
 
+backends/chatterbox: docker-build-chatterbox docker-save-chatterbox build
+	./local-ai backends install "ocifile://$(abspath ./backend-images/chatterbox.tar)"
+
 backends/llama-cpp-darwin: build
 	bash ./scripts/build/llama-cpp-darwin.sh
 	./local-ai backends install "ocifile://$(abspath ./backend-images/llama-cpp.tar)"
 
 build-darwin-python-backend: build
 	bash ./scripts/build/python-darwin.sh
+
+build-darwin-go-backend: build
+	bash ./scripts/build/golang-darwin.sh
 
 backends/mlx:
 	BACKEND=mlx $(MAKE) build-darwin-python-backend
@@ -391,6 +397,10 @@ backends/mlx-vlm:
 backends/mlx-audio:
 	BACKEND=mlx-audio $(MAKE) build-darwin-python-backend
 	./local-ai backends install "ocifile://$(abspath ./backend-images/mlx-audio.tar)"
+
+backends/stablediffusion-ggml-darwin:
+	BACKEND=stablediffusion-ggml BUILD_TYPE=metal $(MAKE) build-darwin-go-backend
+	./local-ai backends install "ocifile://$(abspath ./backend-images/stablediffusion-ggml.tar)"
 
 backend-images:
 	mkdir -p backend-images
@@ -418,6 +428,9 @@ docker-build-kitten-tts:
 
 docker-save-kitten-tts: backend-images
 	docker save local-ai-backend:kitten-tts -o backend-images/kitten-tts.tar
+
+docker-save-chatterbox: backend-images
+	docker save local-ai-backend:chatterbox -o backend-images/chatterbox.tar
 
 docker-build-kokoro:
 	docker build --build-arg BUILD_TYPE=$(BUILD_TYPE) --build-arg BASE_IMAGE=$(BASE_IMAGE) -t local-ai-backend:kokoro -f backend/Dockerfile.python --build-arg BACKEND=kokoro ./backend
@@ -486,7 +499,7 @@ docker-build-bark:
 	docker build --build-arg BUILD_TYPE=$(BUILD_TYPE) --build-arg BASE_IMAGE=$(BASE_IMAGE) -t local-ai-backend:bark -f backend/Dockerfile.python --build-arg BACKEND=bark .
 
 docker-build-chatterbox:
-	docker build --build-arg BUILD_TYPE=$(BUILD_TYPE) --build-arg BASE_IMAGE=$(BASE_IMAGE) -t local-ai-backend:chatterbox -f backend/Dockerfile.python --build-arg BACKEND=chatterbox .
+	docker build --build-arg BUILD_TYPE=$(BUILD_TYPE) --build-arg BASE_IMAGE=$(BASE_IMAGE) -t local-ai-backend:chatterbox -f backend/Dockerfile.python --build-arg BACKEND=chatterbox ./backend
 
 docker-build-exllama2:
 	docker build --build-arg BUILD_TYPE=$(BUILD_TYPE) --build-arg BASE_IMAGE=$(BASE_IMAGE) -t local-ai-backend:exllama2 -f backend/Dockerfile.python --build-arg BACKEND=exllama2 .

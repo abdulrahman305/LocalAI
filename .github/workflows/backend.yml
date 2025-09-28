@@ -111,6 +111,18 @@ jobs:
             backend: "diffusers"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
+          - build-type: ''
+            cuda-major-version: ""
+            cuda-minor-version: ""
+            platforms: 'linux/amd64'
+            tag-latest: 'auto'
+            tag-suffix: '-cpu-chatterbox'
+            runs-on: 'ubuntu-latest'
+            base-image: "ubuntu:22.04"
+            skip-drivers: 'true'
+            backend: "chatterbox"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./backend"
           # CUDA 11 additional backends
           - build-type: 'cublas'
             cuda-major-version: "11"
@@ -230,7 +242,7 @@ jobs:
             runs-on: 'ubuntu-latest'
             base-image: "ubuntu:22.04"
             skip-drivers: 'false'
-            backend: "diffusers"            
+            backend: "diffusers"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
           # CUDA 12 additional backends
@@ -475,6 +487,18 @@ jobs:
             base-image: "quay.io/go-skynet/intel-oneapi-base:latest"
             skip-drivers: 'false'
             backend: "diffusers"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./backend"
+          - build-type: 'l4t'
+            cuda-major-version: "12"
+            cuda-minor-version: "0"
+            platforms: 'linux/arm64'
+            tag-latest: 'auto'
+            tag-suffix: '-gpu-nvidia-l4t-kokoro'
+            runs-on: 'ubuntu-24.04-arm'
+            base-image: "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
+            skip-drivers: 'true'
+            backend: "kokoro"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
           # SYCL additional backends
@@ -763,7 +787,7 @@ jobs:
             cuda-minor-version: ""
             platforms: 'linux/amd64'
             tag-latest: 'auto'
-            tag-suffix: '-gpu-hipblas-whisper'
+            tag-suffix: '-gpu-rocm-hipblas-whisper'
             base-image: "rocm/dev-ubuntu-22.04:6.4.3"
             runs-on: 'ubuntu-latest'
             skip-drivers: 'false'
@@ -858,7 +882,7 @@ jobs:
             backend: "rfdetr"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
-          - build-type: 'cublas'
+          - build-type: 'l4t'
             cuda-major-version: "12"
             cuda-minor-version: "0"
             platforms: 'linux/arm64'
@@ -931,6 +955,18 @@ jobs:
             backend: "exllama2"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
+          - build-type: 'l4t'
+            cuda-major-version: "12"
+            cuda-minor-version: "0"
+            platforms: 'linux/arm64'
+            skip-drivers: 'true'
+            tag-latest: 'auto'
+            tag-suffix: '-gpu-nvidia-l4t-arm64-chatterbox'
+            base-image: "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
+            runs-on: 'ubuntu-24.04-arm'
+            backend: "chatterbox"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./backend"
           # runs out of space on the runner
           # - build-type: 'hipblas'
           #   cuda-major-version: ""
@@ -957,53 +993,41 @@ jobs:
             backend: "kitten-tts"
             dockerfile: "./backend/Dockerfile.python"
             context: "./backend"
-  diffusers-darwin:
+  backend-jobs-darwin:
     uses: ./.github/workflows/backend_build_darwin.yml
+    strategy:
+      matrix:
+        include:
+          - backend: "diffusers"
+            tag-suffix: "-metal-darwin-arm64-diffusers"
+            build-type: "mps"
+          - backend: "mlx"
+            tag-suffix: "-metal-darwin-arm64-mlx"
+            build-type: "mps"
+          - backend: "chatterbox"
+            tag-suffix: "-metal-darwin-arm64-chatterbox"
+            build-type: "mps"
+          - backend: "mlx-vlm"
+            tag-suffix: "-metal-darwin-arm64-mlx-vlm"
+            build-type: "mps"
+          - backend: "mlx-audio"
+            tag-suffix: "-metal-darwin-arm64-mlx-audio"
+            build-type: "mps"
+          - backend: "stablediffusion-ggml"
+            tag-suffix: "-metal-darwin-arm64-stablediffusion-ggml"
+            build-type: "metal"
+            lang: "go"
+          - backend: "whisper"
+            tag-suffix: "-metal-darwin-arm64-whisper"
+            build-type: "metal"
+            lang: "go"
     with:
-      backend: "diffusers"
-      build-type: "mps"
+      backend: ${{ matrix.backend }}
+      build-type: ${{ matrix.build-type }}
       go-version: "1.24.x"
-      tag-suffix: "-metal-darwin-arm64-diffusers"
-      use-pip: true
-      runs-on: "macOS-14"
-    secrets:
-      dockerUsername: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerPassword: ${{ secrets.DOCKERHUB_PASSWORD }}
-      quayUsername: ${{ secrets.LOCALAI_REGISTRY_USERNAME }}
-      quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
-  mlx-darwin:
-    uses: ./.github/workflows/backend_build_darwin.yml
-    with:
-      backend: "mlx"
-      build-type: "mps"
-      go-version: "1.24.x"
-      tag-suffix: "-metal-darwin-arm64-mlx"
-      runs-on: "macOS-14"
-    secrets:
-      dockerUsername: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerPassword: ${{ secrets.DOCKERHUB_PASSWORD }}
-      quayUsername: ${{ secrets.LOCALAI_REGISTRY_USERNAME }}
-      quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
-  mlx-vlm-darwin:
-    uses: ./.github/workflows/backend_build_darwin.yml
-    with:
-      backend: "mlx-vlm"
-      build-type: "mps"
-      go-version: "1.24.x"
-      tag-suffix: "-metal-darwin-arm64-mlx-vlm"
-      runs-on: "macOS-14"
-    secrets:
-      dockerUsername: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerPassword: ${{ secrets.DOCKERHUB_PASSWORD }}
-      quayUsername: ${{ secrets.LOCALAI_REGISTRY_USERNAME }}
-      quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
-  mlx-audio-darwin:
-    uses: ./.github/workflows/backend_build_darwin.yml
-    with:
-      backend: "mlx-audio"
-      build-type: "mps"
-      go-version: "1.24.x"
-      tag-suffix: "-metal-darwin-arm64-mlx-audio"
+      tag-suffix: ${{ matrix.tag-suffix }}
+      lang: ${{ matrix.lang || 'python' }}
+      use-pip: ${{ matrix.backend == 'diffusers' }}
       runs-on: "macOS-14"
     secrets:
       dockerUsername: ${{ secrets.DOCKERHUB_USERNAME }}

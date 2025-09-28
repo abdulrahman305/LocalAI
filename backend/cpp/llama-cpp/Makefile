@@ -1,5 +1,5 @@
 
-LLAMA_VERSION?=c97dc093912ad014f6d22743ede0d4d7fd82365a
+LLAMA_VERSION?=4807e8f96a61b2adccebd5e57444c94d18de7264
 LLAMA_REPO?=https://github.com/ggerganov/llama.cpp
 
 CMAKE_ARGS?=
@@ -14,7 +14,7 @@ CMAKE_ARGS+=-DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF
 
 CURRENT_MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 ifeq ($(NATIVE),false)
-	CMAKE_ARGS+=-DGGML_NATIVE=OFF
+	CMAKE_ARGS+=-DGGML_NATIVE=OFF -DLLAMA_OPENSSL=OFF
 endif
 # If build type is cublas, then we set -DGGML_CUDA=ON to CMAKE_ARGS automatically
 ifeq ($(BUILD_TYPE),cublas)

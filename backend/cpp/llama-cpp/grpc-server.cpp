@@ -231,6 +231,7 @@ static void params_parse(const backend::ModelOptions* request,
     params.cpuparams.n_threads = request->threads();
     params.n_gpu_layers = request->ngpulayers();
     params.n_batch = request->nbatch();
+    params.n_ubatch = request->nbatch(); // fixes issue with reranking models being limited to 512 tokens (the default n_ubatch size); allows for setting the maximum input amount of tokens thereby avoiding this error "input is too large to process. increase the physical batch size"
     // Set params.n_parallel by environment variable (LLAMA_PARALLEL), defaults to 1
     //params.n_parallel = 1;
     const char *env_parallel = std::getenv("LLAMACPP_PARALLEL");
@@ -304,7 +305,15 @@ static void params_parse(const backend::ModelOptions* request,
     }
     params.use_mlock = request->mlock();
     params.use_mmap = request->mmap();
-    params.flash_attn = request->flashattention();
+
+    if (request->flashattention() == "on" || request->flashattention() == "enabled") {
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    } else if (request->flashattention() == "off" || request->flashattention() == "disabled") {
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    } else if (request->flashattention() == "auto") {
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+    }
+
     params.no_kv_offload = request->nokvoffload();
     params.ctx_shift = false; // We control context-shifting in any case (and we disable it as it could just lead to infinite loops)
 
@@ -693,7 +702,7 @@ public:
         */
 
         // for the shape of input/content, see tokenize_input_prompts()
-        json prompt = body.at("prompt");
+        json prompt = body.at("embeddings");
 
 
         auto tokenized_prompts = tokenize_input_prompts(ctx_server.vocab, ctx_server.mctx, prompt, true, true);
@@ -704,6 +713,7 @@ public:
             }
         }
 
+        int embd_normalize = 2; // default to Euclidean/L2 norm
         // create and queue the task
         json responses = json::array();
         bool error = false;
@@ -717,9 +727,8 @@ public:
                 task.index         = i;
                 task.prompt_tokens = std::move(tokenized_prompts[i]);
 
-                // OAI-compat
-                task.params.oaicompat = OAICOMPAT_TYPE_EMBEDDING;
-
+                task.params.oaicompat = OAICOMPAT_TYPE_NONE;
+                task.params.embd_normalize = embd_normalize;
                 tasks.push_back(std::move(task));
             }
 
@@ -735,9 +744,8 @@ public:
                 responses.push_back(res->to_json());
             }
         }, [&](const json & error_data) {
-            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, error_data.value("content", ""));
+            error = true;
         }, [&]() {
-            // NOTE: we should try to check when the writer is closed here
             return false;
         });
 
@@ -747,11 +755,35 @@ public:
             return grpc::Status(grpc::StatusCode::INTERNAL, "Error in receiving results");
         }
 
-        std::vector<float> embeddings = responses[0].value("embedding", std::vector<float>());
-        // loop the vector and set the embeddings results
-        for (int i = 0; i < embeddings.size(); i++) {
-            embeddingResult->add_embeddings(embeddings[i]);
+        std::cout << "[DEBUG] Responses size: " << responses.size() << std::endl;
+        
+        // Process the responses and extract embeddings
+        for (const auto & response_elem : responses) {
+            // Check if the response has an "embedding" field
+            if (response_elem.contains("embedding")) {
+                json embedding_data = json_value(response_elem, "embedding", json::array());
+                
+                if (embedding_data.is_array() && !embedding_data.empty()) {
+                    for (const auto & embedding_vector : embedding_data) {
+                        if (embedding_vector.is_array()) {
+                            for (const auto & embedding_value : embedding_vector) {
+                                embeddingResult->add_embeddings(embedding_value.get<float>());
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Check if the response itself contains the embedding data directly
+                if (response_elem.is_array()) {
+                    for (const auto & embedding_value : response_elem) {
+                        embeddingResult->add_embeddings(embedding_value.get<float>());
+                    }
+                }
+            }
         }
+
+
+    
 
         return grpc::Status::OK;
     }
@@ -770,11 +802,6 @@ public:
             return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "\"documents\" must be a non-empty string array");
         }
 
-        // Tokenize the query
-        auto tokenized_query = tokenize_input_prompts(ctx_server.vocab, ctx_server.mctx, request->query(), /* add_special */ false, true);
-        if (tokenized_query.size() != 1) {
-            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "\"query\" must contain only a single prompt");
-        }
         // Create and queue the task
         json responses = json::array();
         bool error = false;
@@ -786,10 +813,9 @@ public:
                 documents.push_back(request->documents(i));
             }
             
-            auto tokenized_docs = tokenize_input_prompts(ctx_server.vocab, ctx_server.mctx, documents, /* add_special */ false, true);
-            tasks.reserve(tokenized_docs.size());
-            for (size_t i = 0; i < tokenized_docs.size(); i++) {
-                auto tmp = format_rerank(ctx_server.vocab, tokenized_query[0], tokenized_docs[i]);
+            tasks.reserve(documents.size());
+            for (size_t i = 0; i < documents.size(); i++) {
+                auto tmp = format_rerank(ctx_server.model, ctx_server.vocab, ctx_server.mctx, request->query(), documents[i]);
                 server_task task = server_task(SERVER_TASK_TYPE_RERANK);
                 task.id = ctx_server.queue_tasks.get_new_id();
                 task.index = i;

@@ -8,7 +8,7 @@ JOBS?=$(shell nproc --ignore=1)
 
 # whisper.cpp version
 WHISPER_REPO?=https://github.com/ggml-org/whisper.cpp
-WHISPER_CPP_VERSION?=7745fcf32846006128f16de429cfe1677c963b30
+WHISPER_CPP_VERSION?=44fa2f647cf2a6953493b21ab83b50d5f5dbc483
 
 CMAKE_ARGS+=-DBUILD_SHARED_LIBS=OFF
 
@@ -68,10 +68,10 @@ libgowhisper.so: sources/whisper.cpp CMakeLists.txt gowhisper.cpp gowhisper.h
 whisper: main.go gowhisper.go libgowhisper.so
 	CGO_ENABLED=0 $(GOCMD) build -tags "$(GO_TAGS)" -o whisper ./
 
-package:
+package: whisper
 	bash package.sh
 
-build: whisper package
+build: package
 
 clean:
 	rm -rf libgowhisper.o build whisper
