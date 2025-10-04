@@ -1,4 +1,68 @@
 ---
+- &granite4
+  url: "github:mudler/LocalAI/gallery/granite4.yaml@master"
+  name: "ibm-granite_granite-4.0-h-small"
+  license: apache-2.0
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/639bcaa2445b133a4e942436/CEW-OjXkRkDNmTxSu8Egh.png
+  tags:
+    - gguf
+    - GPU
+    - CPU
+    - text-to-text
+  urls:
+    - https://huggingface.co/ibm-granite/granite-4.0-h-small
+    - https://huggingface.co/bartowski/ibm-granite_granite-4.0-h-small-GGUF
+  description: |
+      Granite-4.0-H-Small is a 32B parameter long-context instruct model finetuned from Granite-4.0-H-Small-Base using a combination of open source instruction datasets with permissive license and internally collected synthetic datasets. This model is developed using a diverse set of techniques with a structured chat format, including supervised finetuning, model alignment using reinforcement learning, and model merging. Granite 4.0 instruct models feature improved instruction following (IF) and tool-calling capabilities, making them more effective in enterprise applications.
+  overrides:
+    parameters:
+      model: ibm-granite_granite-4.0-h-small-Q4_K_M.gguf
+  files:
+    - filename: ibm-granite_granite-4.0-h-small-Q4_K_M.gguf
+      sha256: c59ce76239bd5794acdbdf88616dfc296247f4e78792a9678d4b3e24966ead69
+      uri: huggingface://bartowski/ibm-granite_granite-4.0-h-small-GGUF/ibm-granite_granite-4.0-h-small-Q4_K_M.gguf
+- !!merge <<: *granite4
+  name: "ibm-granite_granite-4.0-h-tiny"
+  urls:
+    - https://huggingface.co/ibm-granite/granite-4.0-h-tiny
+    - https://huggingface.co/bartowski/ibm-granite_granite-4.0-h-tiny-GGUF
+  description: |
+     Granite-4.0-H-Tiny is a 7B parameter long-context instruct model finetuned from Granite-4.0-H-Tiny-Base using a combination of open source instruction datasets with permissive license and internally collected synthetic datasets. This model is developed using a diverse set of techniques with a structured chat format, including supervised finetuning, model alignment using reinforcement learning, and model merging. Granite 4.0 instruct models feature improved instruction following (IF) and tool-calling capabilities, making them more effective in enterprise applications.
+  overrides:
+    parameters:
+      model: ibm-granite_granite-4.0-h-tiny-Q4_K_M.gguf
+  files:
+    - filename: ibm-granite_granite-4.0-h-tiny-Q4_K_M.gguf
+      sha256: 33a689fe7f35b14ebab3ae599b65aaa3ed8548c393373b1b0eebee36c653146f
+      uri: huggingface://bartowski/ibm-granite_granite-4.0-h-tiny-GGUF/ibm-granite_granite-4.0-h-tiny-Q4_K_M.gguf
+- !!merge <<: *granite4
+  name: "ibm-granite_granite-4.0-h-micro"
+  urls:
+    - https://huggingface.co/ibm-granite/granite-4.0-h-micro
+    - https://huggingface.co/bartowski/ibm-granite_granite-4.0-h-micro-GGUF
+  description: |
+    Granite-4.0-H-Micro is a 3B parameter long-context instruct model finetuned from Granite-4.0-H-Micro-Base using a combination of open source instruction datasets with permissive license and internally collected synthetic datasets. This model is developed using a diverse set of techniques with a structured chat format, including supervised finetuning, model alignment using reinforcement learning, and model merging. Granite 4.0 instruct models feature improved instruction following (IF) and tool-calling capabilities, making them more effective in enterprise applications.
+  overrides:
+    parameters:
+      model: ibm-granite_granite-4.0-h-micro-Q4_K_M.gguf
+  files:
+    - filename: ibm-granite_granite-4.0-h-micro-Q4_K_M.gguf
+      sha256: 48376d61449687a56b3811a418d92cc0e8e77b4d96ec13eb6c9d9503968c9f20
+      uri: huggingface://bartowski/ibm-granite_granite-4.0-h-micro-GGUF/ibm-granite_granite-4.0-h-micro-Q4_K_M.gguf
+- !!merge <<: *granite4
+  name: "ibm-granite_granite-4.0-micro"
+  urls:
+    - https://huggingface.co/ibm-granite/granite-4.0-micro
+    - https://huggingface.co/bartowski/ibm-granite_granite-4.0-micro-GGUF
+  description: |
+    Granite-4.0-Micro is a 3B parameter long-context instruct model finetuned from Granite-4.0-Micro-Base using a combination of open source instruction datasets with permissive license and internally collected synthetic datasets. This model is developed using a diverse set of techniques with a structured chat format, including supervised finetuning, model alignment using reinforcement learning, and model merging. Granite 4.0 instruct models feature improved instruction following (IF) and tool-calling capabilities, making them more effective in enterprise applications.
+  overrides:
+    parameters:
+      model: ibm-granite_granite-4.0-micro-Q4_K_M.gguf
+  files:
+    - filename: ibm-granite_granite-4.0-micro-Q4_K_M.gguf
+      sha256: bd9d7b4795b9dc44e3e81aeae93bb5d8e6b891b7e823be5bf9910ed3ac060baf
+      uri: huggingface://bartowski/ibm-granite_granite-4.0-micro-GGUF/ibm-granite_granite-4.0-micro-Q4_K_M.gguf
 - &ernie
   url: "github:mudler/LocalAI/gallery/chatml.yaml@master"
   name: "baidu_ernie-4.5-21b-a3b-thinking"
