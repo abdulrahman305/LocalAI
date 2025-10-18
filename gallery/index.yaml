@@ -4087,6 +4087,28 @@
     - filename: yanolja_YanoljaNEXT-Rosetta-12B-2510-Q4_K_M.gguf
       sha256: 7531456d8886419d36ce103b1205cdc820865016bddc0b4671ec9910ba87071f
       uri: huggingface://bartowski/yanolja_YanoljaNEXT-Rosetta-12B-2510-GGUF/yanolja_YanoljaNEXT-Rosetta-12B-2510-Q4_K_M.gguf
+- !!merge <<: *gemma3
+  name: "mira-v1.7-27b-i1"
+  icon: https://pbs.twimg.com/media/G3V_LsQX0AASFZa?format=jpg&name=medium
+  urls:
+    - https://huggingface.co/mradermacher/Mira-v1.7-27B-i1-GGUF
+  description: |
+    **Model Name:** Mira-v1.7-27B
+    **Base Model:** Lambent/Mira-v1.6a-27B
+    **Size:** 27 billion parameters
+    **License:** Gemma
+    **Type:** Large Language Model (Vision-capable)
+    **Description:**
+    Mira-v1.7-27B is a creatively driven, locally running language model trained on self-development sessions, high-quality synthesized roleplay data, and prior training data. It was fine-tuned with preference alignment to emphasize authentic, expressive, and narrative-driven output—balancing creative expression as "Mira" against its role as an AI assistant. The model exhibits strong poetic and stylistic capabilities, producing rich, emotionally resonant text across various prompts. It supports vision via MMProjection (separate files available in the static repo). Designed for local deployment, it excels in imaginative writing, introspective storytelling, and expressive dialogue.
+
+    *Note: The GGUF quantized versions (e.g., `mradermacher/Mira-v1.7-27B-i1-GGUF`) are community-quantized variants; the original base model remains hosted at [Lambent/Mira-v1.7-27B](https://huggingface.co/Lambent/Mira-v1.7-27B).*
+  overrides:
+    parameters:
+      model: Mira-v1.7-27B.i1-Q4_K_M.gguf
+  files:
+    - filename: Mira-v1.7-27B.i1-Q4_K_M.gguf
+      sha256: 6deb401a296dbb9f02fee0442e4e54bbc3c8208daca7cef7a207536d311a85e3
+      uri: huggingface://mradermacher/Mira-v1.7-27B-i1-GGUF/Mira-v1.7-27B.i1-Q4_K_M.gguf
 - &llama4
   url: "github:mudler/LocalAI/gallery/llama3.1-instruct.yaml@master"
   icon: https://avatars.githubusercontent.com/u/153379578
@@ -21824,3 +21846,236 @@
     - filename: tlacuilo-12b-q4_k_m.gguf
       sha256: c362bc081b03a8f4f5dcd27373e9c2b60bdc0d168308ede13c4e282c5ab7fa88
       uri: huggingface://Ennthen/Tlacuilo-12B-Q4_K_M-GGUF/tlacuilo-12b-q4_k_m.gguf
+- !!merge <<: *hermes-2-pro-mistral
+  name: "hermespersona-24b"
+  urls:
+    - https://huggingface.co/mradermacher/HermesPersona-24B-GGUF
+  description: |
+    **HermesPersona-24B** is a large language model developed by merging two personality-focused 24B-parameter models—*DeepPersonalityDangerousDolphin-24B* and *Dans-PersonalityEngine-V1.3.0-24b*—using the **LazyMergekit** framework. The merge employs an *arcee_fusion* method with **bfloat16** precision, resulting in a model optimized for expressive, nuanced, and human-like conversational behavior. Ideal for roleplay, storytelling, and emotionally intelligent dialogue, HermesPersona-24B excels at maintaining consistent character personas across interactions. It is designed for use with Hugging Face's `transformers` library and supports both inference and fine-tuning workflows. This model is a high-fidelity, open-source alternative for applications requiring deep personality modeling and rich narrative engagement.
+  overrides:
+    parameters:
+      model: HermesPersona-24B.Q4_K_S.gguf
+  files:
+    - filename: HermesPersona-24B.Q4_K_S.gguf
+      sha256: 9f4c910d76c5d94ad81ea9f5e9d486ec3a89ce982d01b77f6b8c4d3b0c1cd3a6
+      uri: huggingface://mradermacher/HermesPersona-24B-GGUF/HermesPersona-24B.Q4_K_S.gguf
+- !!merge <<: *qwen3
+  name: "qwen3-tnd-double-deckard-a-c-11b-220-i1"
+  urls:
+    - https://huggingface.co/mradermacher/Qwen3-TND-Double-Deckard-A-C-11B-220-i1-GGUF
+  description: |
+    **Model Name:** Qwen3-TND-Double-Deckard-A-C-11B-220
+    **Base Model:** Qwen3-DND-Jan-v1-256k-ctx-Brainstorm40x-8B
+    **Size:** 11.2 billion parameters
+    **Architecture:** Transformer-based, instruction-tuned, with enhanced reasoning via "Brainstorm 40x" expansion
+    **Context Length:** Up to 256,000 tokens
+    **Training Method:** Fine-tuned using the "PDK" (Philip K. Dick) datasets via Unsloth, merged from two variants (A & C), followed by light repair training
+
+    **Key Features:**
+    - **Triple Neuron Density:** Expanded to 108 layers and 1,190 tensors—nearly 3x the density of a standard Qwen3 8B model—enhancing detail, coherence, and world-modeling.
+    - **Brainstorm 40x Process:** A custom architectural refinement that splits, reassembles, and calibrates reasoning centers 40 times to improve nuance, emotional depth, and prose quality without sacrificing instruction-following.
+    - **Highly Creative & Reasoning-Optimized:** Excels at long-form storytelling, complex problem-solving, and detailed code generation with strong focus, reduced clichés, and vivid descriptions.
+    - **Template Support:** Uses Jinja or CHATML formatting for structured prompts and dialogues.
+
+    **Best For:**
+    - Advanced creative writing, worldbuilding, and narrative generation
+    - Multi-step reasoning and complex coding tasks
+    - Roleplay, brainstorming, and deep conceptual exploration
+    - Users seeking high-quality, human-like prose with rich internal logic
+
+    **Notes:**
+    - This is a full-precision source model (safe tensors format) — **not quantized** — ideal for developers and researchers.
+    - Quantized versions (GGUF, GPTQ, etc.) are available separately by the community (e.g., @mradermacher).
+    - Recommended for high-end inference setups; best results with Q6+ quantizations for complex tasks.
+
+    **License:** Apache 2.0
+    **Repository:** [DavidAU/Qwen3-TND-Double-Deckard-A-C-11B-220](https://huggingface.co/DavidAU/Qwen3-TND-Double-Deckard-A-C-11B-220)
+
+    > *A bold, experimental evolution of Qwen3—crafted for depth, precision, and creative power.*
+  overrides:
+    parameters:
+      model: Qwen3-TND-Double-Deckard-A-C-11B-220.i1-Q4_K_M.gguf
+  files:
+    - filename: Qwen3-TND-Double-Deckard-A-C-11B-220.i1-Q4_K_M.gguf
+      sha256: 51a37e9d0307171ac86a87964f33be863c49c71f87255a67f0444930621d53b8
+      uri: huggingface://mradermacher/Qwen3-TND-Double-Deckard-A-C-11B-220-i1-GGUF/Qwen3-TND-Double-Deckard-A-C-11B-220.i1-Q4_K_M.gguf
+- !!merge <<: *mistral03
+  name: "magidonia-24b-v4.2.0-i1"
+  icon: https://cdn-uploads.huggingface.co/production/uploads/65f2fd1c25b848bd061b5c2e/A-4o0PBQz9tX0W2T2KwVv.png
+  urls:
+    - https://huggingface.co/mradermacher/Magidonia-24B-v4.2.0-i1-GGUF
+  description: |
+    **Model Name:** Magidonia 24B v4.2.0
+    **Base Model:** mistralai/Magistral-Small-2509
+    **Author:** TheDrummer
+    **License:** MIT (as per standard for Hugging Face models)
+    **Model Type:** Fine-tuned large language model (LLM)
+    **Size:** 24 billion parameters
+
+    **Description:**
+    Magidonia 24B v4.2.0 is a creatively-oriented, open-weight fine-tuned language model developed by TheDrummer. Built upon the **Magistral-Small-2509** base, this model emphasizes **creativity, narrative dynamism, and expressive language use**—ideal for storytelling, roleplay, and imaginative writing. It features enhanced reasoning with a built-in **THINKING MODE**, activated using `<tool_call>` and `</tool_call>` tokens, encouraging detailed inner monologue before response generation. Designed for flexibility and minimal alignment constraints, it's well-suited for entertainment, world-building, and experimental use cases.
+
+    **Key Features:**
+    - Strong creative and literary capabilities
+    - Supports structured thinking via special tokens
+    - Optimized for roleplay and dynamic storytelling
+    - Available in GGUF format for local inference (via llama.cpp, etc.)
+    - Includes iMatrix quantization for high-quality low-precision performance
+
+    **Use Case:** Ideal for writers, game masters, and AI artists seeking expressive, unfiltered, and imaginative language models.
+
+    **Repository:** [TheDrummer/Magidonia-24B-v4.2.0](https://huggingface.co/TheDrummer/Magidonia-24B-v4.2.0)
+    **Quantized Version (GGUF):** [mradermacher/Magidonia-24B-v4.2.0-i1-GGUF](https://huggingface.co/mradermacher/Magidonia-24B-v4.2.0-i1-GGUF) *(for reference only — use original for full description)*
+  overrides:
+    parameters:
+      model: Magidonia-24B-v4.2.0.i1-Q4_K_M.gguf
+  files:
+    - filename: Magidonia-24B-v4.2.0.i1-Q4_K_M.gguf
+      sha256: f89fbe09ea9edd4b91aa89516cbfaabdf0d956e0458cfc4b44b8054a1546b559
+      uri: huggingface://mradermacher/Magidonia-24B-v4.2.0-i1-GGUF/Magidonia-24B-v4.2.0.i1-Q4_K_M.gguf
+- !!merge <<: *qwen25coder
+  name: "strand-rust-coder-14b-v1-i1"
+  urls:
+    - https://huggingface.co/mradermacher/Strand-Rust-Coder-14B-v1-i1-GGUF
+  description: |
+    **Strand-Rust-Coder-14B-v1** is a high-performance, domain-specialized large language model fine-tuned for Rust programming. Built on **Qwen2.5-Coder-14B-Instruct** using LoRA and trained on a 191K-example synthetic dataset generated via peer-reviewed Swarm Inference, it achieves state-of-the-art performance on Rust-specific benchmarks — outperforming larger proprietary models like GPT-5 Codex on tasks such as code generation, test creation, and refactoring.
+
+    Key highlights:
+    - **Specialized for Rust**: Optimized for ownership, lifetimes, and idiomatic syntax.
+    - **High accuracy**: 48% pass rate on hold-out test sets and 43% on RustEvo².
+    - **Efficient training**: Fine-tuned with LoRA (r=64, α=16), updating only ~1% of parameters.
+    - **Extended context**: 32,768 tokens for complex code reasoning.
+    - **Open & decentralized**: Part of the Fortytwo Network, enabling collaborative, peer-validated inference.
+
+    Ideal for developers, AI code assistants, and researchers working on Rust. Available in GGUF quantized versions for local deployment (Q4_K_M to Q8_0).
+
+    > **Base model**: Qwen2.5-Coder-14B-Instruct
+    > **Dataset**: Fortytwo-Network/Strandset-Rust-v1
+    > **License**: Apache 2.0
+    > **Repository**: [Fortytwo-Network/Strand-Rust-Coder-14B-v1](https://huggingface.co/Fortytwo-Network/Strand-Rust-Coder-14B-v1)
+  overrides:
+    parameters:
+      model: Strand-Rust-Coder-14B-v1.i1-Q4_K_M.gguf
+  files:
+    - filename: Strand-Rust-Coder-14B-v1.i1-Q4_K_M.gguf
+      sha256: 56bacda1fd25cdebd349df839c3ef3248a3e7cb98da6ce1ee1f4e8c2153e777e
+      uri: huggingface://mradermacher/Strand-Rust-Coder-14B-v1-i1-GGUF/Strand-Rust-Coder-14B-v1.i1-Q4_K_M.gguf
+- !!merge <<: *phi4
+  name: "scholasticlogicai-phi-4-i1"
+  urls:
+    - https://huggingface.co/mradermacher/ScholasticLogicAI-Phi-4-i1-GGUF
+  description: |
+    **Model Name:** ScholasticLogicAI-Phi-4
+    **Base Model:** Microsoft Phi-4
+    **Repository:** [Berthi-Rohar/ScholasticLogicAI-Phi-4](https://huggingface.co/Berthi-Rohar/ScholasticLogicAI-Phi-4)
+    **Description:**
+    A fine-tuned variant of Microsoft's Phi-4, specialized in logical reasoning using Aristotelian and scholastic logic frameworks. This model is designed to perform structured, deductive reasoning tasks, making it ideal for philosophical, analytical, and formal logic applications. It is part of an experimental project aimed at exploring the integration of classical logic paradigms into modern language models.
+
+    **Use Case:**
+    Best suited for tasks involving syllogistic reasoning, argument analysis, formal deduction, and logical consistency checks. Not intended for general conversation or casual use.
+
+    **Key Features:**
+    - Built on the Phi-4 architecture for high efficiency and performance.
+    - Fine-tuned for logical coherence and structured reasoning.
+    - Supports chat template input for interactive reasoning sessions.
+
+    **Note:** This model is experimental and may hallucinate or fail under complex or ambiguous prompts. Ideal for developers and researchers in logic, AI reasoning, and knowledge representation.
+
+    **License:** [MIT](https://github.com/Berthi-Rohar/ScholasticLogicAI-Phi-4/blob/main/LICENSE) (check original Phi-4 for base license).
+
+    *Quantized versions available via [mradermacher/ScholasticLogicAI-Phi-4-i1-GGUF](https://huggingface.co/mradermacher/ScholasticLogicAI-Phi-4-i1-GGUF) for local inference.*
+  overrides:
+    parameters:
+      model: ScholasticLogicAI-Phi-4.i1-Q4_K_M.gguf
+  files:
+    - filename: ScholasticLogicAI-Phi-4.i1-Q4_K_M.gguf
+      sha256: 6b1bb32b74979833b17cfe1b47c3bdd9f9b60ba283c486767e612ff33a073d9f
+      uri: huggingface://mradermacher/ScholasticLogicAI-Phi-4-i1-GGUF/ScholasticLogicAI-Phi-4.i1-Q4_K_M.gguf
+- !!merge <<: *mistral03
+  name: "cydonia-24b-v4.2.0-i1"
+  urls:
+    - https://huggingface.co/mradermacher/Cydonia-24B-v4.2.0-i1-GGUF
+  description: |
+    **Cydonia-24B-v4.2.0** is a creatively oriented, large language model developed by *TheDrummer*, based on the **Mistral-Small-3.2-24B-Instruct-2507** foundation. Fine-tuned for dynamic storytelling, imaginative writing, and expressive roleplay, it excels in narrative coherence, linguistic flair, and non-aligned, open-ended interaction. Designed for users seeking creativity over strict alignment, the model delivers rich, engaging, and often surprising outputs—ideal for fiction writing, worldbuilding, and entertainment-focused AI use.
+
+    **Key Features:**
+    - Built on Mistral-Small-3.2-24B-Instruct-2507 base
+    - Optimized for creative writing, roleplay, and narrative depth
+    - Minimal alignment constraints for greater freedom and expression
+    - Available in GGUF, EXL3, and iMatrix formats for local inference
+
+    > *“This is the best model of yours I've tried yet… It writes superbly well.”* – User testimonial
+
+    **Best For:** Writers, worldbuilders, and creators who value imagination, voice, and stylistic richness over rigid safety or factual accuracy.
+
+    *Model Repository:* [TheDrummer/Cydonia-24B-v4.2.0](https://huggingface.co/TheDrummer/Cydonia-24B-v4.2.0)
+  overrides:
+    parameters:
+      model: Cydonia-24B-v4.2.0.i1-Q4_K_S.gguf
+  files:
+    - filename: Cydonia-24B-v4.2.0.i1-Q4_K_S.gguf
+      sha256: e3a9da91558f81ccc0a707ef3cea9f18b8734db93d5214a24a889f51a3b19a5f
+      uri: huggingface://mradermacher/Cydonia-24B-v4.2.0-i1-GGUF/Cydonia-24B-v4.2.0.i1-Q4_K_S.gguf
+- !!merge <<: *qwen3
+  name: "aevum-0.6b-finetuned"
+  urls:
+    - https://huggingface.co/mradermacher/Aevum-0.6B-Finetuned-GGUF
+  description: |
+    **Model Name:** Aevum-0.6B-Finetuned
+    **Base Model:** Qwen3-0.6B
+    **Architecture:** Decoder-only Transformer
+    **Parameters:** 0.6 Billion
+    **Task:** Code Generation, Instruction Following
+    **Languages:** English, Python (optimized for code)
+    **License:** Apache 2.0
+
+    **Overview:**
+    Aevum-0.6B-Finetuned is a highly efficient, small-scale language model fine-tuned for code generation and task following. Built on the Qwen3-0.6B foundation, it delivers strong performance—achieving a **HumanEval Pass@1 score of 21.34%**—making it the most parameter-efficient sub-1B model in its category.
+
+    **Key Features:**
+    - Optimized for low-latency inference on CPU and edge devices.
+    - Fine-tuned on MBPP and DeepMind Code Contests for superior code generation accuracy.
+    - Ideal for lightweight development, education, and prototyping.
+
+    **Use Case:**
+    Perfect for developers and researchers needing a fast, compact, and open model for Python code generation without requiring high-end hardware.
+
+    **Performance Benchmark:**
+    Outperforms larger models in efficiency: comparable to models 10x its size in task accuracy.
+
+    **Cite:**
+    @misc{aveum06B2025, title={aevum-0.6B-Finetuned: Lightweight Python Code Generation Model}, author={anonymous}, year={2025}}
+
+    **Try it:**
+    Use via Hugging Face `transformers` library with minimal setup.
+
+    👉 [Model Page on Hugging Face](https://huggingface.co/Aevum-Official/aveum-0.6B-Finetuned)
+  overrides:
+    parameters:
+      model: Aevum-0.6B-Finetuned.Q4_K_M.gguf
+  files:
+    - filename: Aevum-0.6B-Finetuned.Q4_K_M.gguf
+      sha256: 6904b789894a7dae459042a28318e70dbe222cb3e6f892f3fc42e591d4a341a3
+      uri: huggingface://mradermacher/Aevum-0.6B-Finetuned-GGUF/Aevum-0.6B-Finetuned.Q4_K_M.gguf
+- !!merge <<: *hermes-2-pro-mistral
+  name: "tlacuilo-12b-i1"
+  urls:
+    - https://huggingface.co/mradermacher/Tlacuilo-12B-i1-GGUF
+  description: |
+    **Tlacuilo-12B** is a high-quality, instruction-tuned language model designed for creative and roleplay writing. Built on the foundation of **Mistral-Nemo-Base-2407** and **Muse-12B**, it excels in narrative generation, storytelling, and interactive dialogue, with notable improvements in prose style and consistency over previous versions.
+
+    Trained using a multi-stage LoRA process:
+    - **Stage 1**: Fine-tuned on literary texts (28M tokens/epoch) to enhance stylistic richness.
+    - **Stage 2**: Optimized for roleplay using RP datasets (4M tokens), improving character and scenario handling.
+    - **Stage 3**: Instruct-tuned on curated data (1.2M tokens) to ensure strong response quality and alignment.
+
+    The model uses **ChatML** formatting and performs best at moderate temperature (1.0–1.3) with low min-p values. Ideal for writers, game masters, and creative professionals seeking expressive, coherent, and imaginative text generation.
+
+    > **Note**: The GGUF versions in `mradermacher/Tlacuilo-12B-i1-GGUF` are quantized derivatives. The original, full-precision model is hosted at `allura-org/Tlacuilo-12B`.
+  overrides:
+    parameters:
+      model: Tlacuilo-12B.i1-Q4_K_M.gguf
+  files:
+    - filename: Tlacuilo-12B.i1-Q4_K_M.gguf
+      sha256: 94218112aa02113c8e21cd2c1d10818bea39bc6aee7e67be6014f86e80e76cb1
+      uri: huggingface://mradermacher/Tlacuilo-12B-i1-GGUF/Tlacuilo-12B.i1-Q4_K_M.gguf
