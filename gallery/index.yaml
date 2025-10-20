@@ -22169,3 +22169,46 @@
     - filename: Zirel-2.i1-Q4_K_S.gguf
       sha256: 9856e987f5f59c874a8fe26ffb2a2c5b7c60b85186131048536b3f1d91a235a6
       uri: huggingface://mradermacher/Zirel-2-i1-GGUF/Zirel-2.i1-Q4_K_S.gguf
+- !!merge <<: *mistral03
+  icon: https://cdn-uploads.huggingface.co/production/uploads/6671dd5203d6e8087aaf7ce5/-cf4t_CuKPI7iqC9j4aAe.png
+  name: "verbamaxima-12b-i1"
+  urls:
+    - https://huggingface.co/mradermacher/VerbaMaxima-12B-i1-GGUF
+  description: |
+    **VerbaMaxima-12B** is a highly experimental, large language model created through advanced merging techniques using [mergekit](https://github.com/cg123/mergekit). It is based on *natong19/Mistral-Nemo-Instruct-2407-abliterated* and further refined by combining multiple 12B-scale models—including *TheDrummer/UnslopNemo-12B-v4*, *allura-org/Tlacuilo-12B*, and *Trappu/Magnum-Picaro-0.7-v2-12b*—using **model_stock** and **task arithmetic** with a negative lambda for creative deviation.
+
+    The result is a model designed for nuanced, believable storytelling with reduced "purple prose" and enhanced world-building. It excels in roleplay and co-writing scenarios, offering a more natural, less theatrical tone. While experimental and not fully optimized, it delivers a unique, expressive voice ideal for creative and narrative-driven applications.
+
+    > ✅ **Base Model**: natong19/Mistral-Nemo-Instruct-2407-abliterated
+    > 🔄 **Merge Method**: Task Arithmetic + Model Stock
+    > 📌 **Use Case**: Roleplay, creative writing, narrative generation
+    > 🧪 **Status**: Experimental, high potential, not production-ready
+
+    *Note: This is the original, unquantized model. The GGUF version (mradermacher/VerbaMaxima-12B-i1-GGUF) is a quantized derivative for inference on local hardware.*
+  overrides:
+    parameters:
+      model: VerbaMaxima-12B.i1-Q4_K_M.gguf
+  files:
+    - filename: VerbaMaxima-12B.i1-Q4_K_M.gguf
+      sha256: 106040cc375b063b225ae359c5d62893f4699dfd9c33d241cacc6dfe529fa13d
+      uri: huggingface://mradermacher/VerbaMaxima-12B-i1-GGUF/VerbaMaxima-12B.i1-Q4_K_M.gguf
+- !!merge <<: *llama32
+  name: "llama-3.2-3b-small_shiro_roleplay"
+  icon: https://huggingface.co/samunder12/Llama-3.2-3B-small_Shiro_roleplay-gguf/resolve/main/shiro.jpg
+  urls:
+    - https://huggingface.co/samunder12/Llama-3.2-3B-small_Shiro_roleplay-gguf
+  description: |
+    **Model Name:** Llama-3.2-3B-small_Shiro_roleplay-gguf
+    **Base Model:** Meta-Llama-3.2-3B-Instruct (via unsloth/Meta-Llama-3.2-3B-Instruct-bnb-4bit)
+    **Fine-Tuned With:** LoRA (rank 64) using Unsloth for optimized performance
+    **Task:** Roleplay & creative storytelling
+    **Format:** GGUF (Q4_K_M, Q8_0) – optimized for local inference via llama.cpp, LM Studio, Ollama
+    **Context Length:** 4096 tokens
+    **Description:** A compact yet powerful 3.2B-parameter fine-tuned Llama 3.2 model specialized for immersive, witty, and darkly imaginative roleplay. Trained on creative and absurd narrative scenarios, it excels at generating unique characters, engaging scenes, and high-concept storytelling with a distinct, sarcastic flair. Ideal for writers, game masters, and creative developers seeking a responsive, locally runnable assistant for imaginative storytelling.
+  overrides:
+    parameters:
+      model: Llama-3.2-3B-Instruct.Q4_K_M.gguf
+  files:
+    - filename: Llama-3.2-3B-Instruct.Q4_K_M.gguf
+      sha256: 5215294ba79312141a182e9477caaef0f4a44fbc6cc0b421092efe8d7fce03a1
+      uri: huggingface://samunder12/Llama-3.2-3B-small_Shiro_roleplay-gguf/Llama-3.2-3B-Instruct.Q4_K_M.gguf
