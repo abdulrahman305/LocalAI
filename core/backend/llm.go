@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -26,6 +25,7 @@ type LLMResponse struct {
 	Response    string // should this be []byte?
 	Usage       TokenUsage
 	AudioOutput string
+	Logprobs    *schema.Logprobs // Logprobs from the backend response
 }
 
 type TokenUsage struct {
@@ -35,7 +35,7 @@ type TokenUsage struct {
 	TimingTokenGeneration  float64
 }
 
-func ModelInference(ctx context.Context, s string, messages []schema.Message, images, videos, audios []string, loader *model.ModelLoader, c *config.ModelConfig, cl *config.ModelConfigLoader, o *config.ApplicationConfig, tokenCallback func(string, TokenUsage) bool) (func() (LLMResponse, error), error) {
+func ModelInference(ctx context.Context, s string, messages schema.Messages, images, videos, audios []string, loader *model.ModelLoader, c *config.ModelConfig, cl *config.ModelConfigLoader, o *config.ApplicationConfig, tokenCallback func(string, TokenUsage) bool, tools string, toolChoice string, logprobs *int, topLogprobs *int, logitBias map[string]float64) (func() (LLMResponse, error), error) {
 	modelFile := c.Model
 
 	// Check if the modelFile exists, if it doesn't try to load it from the gallery
@@ -47,7 +47,7 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 		if !slices.Contains(modelNames, c.Name) {
 			utils.ResetDownloadTimers()
 			// if we failed to load the model, we try to download it
-			err := gallery.InstallModelFromGallery(o.Galleries, o.BackendGalleries, o.SystemState, loader, c.Name, gallery.GalleryModel{}, utils.DisplayDownloadFunction, o.EnforcePredownloadScans, o.AutoloadBackendGalleries)
+			err := gallery.InstallModelFromGallery(ctx, o.Galleries, o.BackendGalleries, o.SystemState, loader, c.Name, gallery.GalleryModel{}, utils.DisplayDownloadFunction, o.EnforcePredownloadScans, o.AutoloadBackendGalleries)
 			if err != nil {
 				log.Error().Err(err).Msgf("failed to install model %q from gallery", modelFile)
 				//return nil, err
@@ -65,29 +65,8 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 	var protoMessages []*proto.Message
 	// if we are using the tokenizer template, we need to convert the messages to proto messages
 	// unless the prompt has already been tokenized (non-chat endpoints + functions)
-	if c.TemplateConfig.UseTokenizerTemplate && s == "" {
-		protoMessages = make([]*proto.Message, len(messages), len(messages))
-		for i, message := range messages {
-			protoMessages[i] = &proto.Message{
-				Role: message.Role,
-			}
-			switch ct := message.Content.(type) {
-			case string:
-				protoMessages[i].Content = ct
-			case []interface{}:
-				// If using the tokenizer template, in case of multimodal we want to keep the multimodal content as and return only strings here
-				data, _ := json.Marshal(ct)
-				resultData := []struct {
-					Text string `json:"text"`
-				}{}
-				json.Unmarshal(data, &resultData)
-				for _, r := range resultData {
-					protoMessages[i].Content += r.Text
-				}
-			default:
-				return nil, fmt.Errorf("unsupported type for schema.Message.Content for inference: %T", ct)
-			}
-		}
+	if c.TemplateConfig.UseTokenizerTemplate && len(messages) > 0 {
+		protoMessages = messages.ToProto()
 	}
 
 	// in GRPC, the backend is supposed to answer to 1 single token if stream is not supported
@@ -99,6 +78,21 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 		opts.Images = images
 		opts.Videos = videos
 		opts.Audios = audios
+		opts.Tools = tools
+		opts.ToolChoice = toolChoice
+		if logprobs != nil {
+			opts.Logprobs = int32(*logprobs)
+		}
+		if topLogprobs != nil {
+			opts.TopLogprobs = int32(*topLogprobs)
+		}
+		if len(logitBias) > 0 {
+			// Serialize logit_bias map to JSON string for proto
+			logitBiasJSON, err := json.Marshal(logitBias)
+			if err == nil {
+				opts.LogitBias = string(logitBiasJSON)
+			}
+		}
 
 		tokenUsage := TokenUsage{}
 
@@ -130,6 +124,7 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 			}
 
 			ss := ""
+			var logprobs *schema.Logprobs
 
 			var partialRune []byte
 			err := inferenceModel.PredictStream(ctx, opts, func(reply *proto.Reply) {
@@ -140,6 +135,14 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 				tokenUsage.Completion = int(reply.Tokens)
 				tokenUsage.TimingTokenGeneration = reply.TimingTokenGeneration
 				tokenUsage.TimingPromptProcessing = reply.TimingPromptProcessing
+
+				// Parse logprobs from reply if present (collect from last chunk that has them)
+				if len(reply.Logprobs) > 0 {
+					var parsedLogprobs schema.Logprobs
+					if err := json.Unmarshal(reply.Logprobs, &parsedLogprobs); err == nil {
+						logprobs = &parsedLogprobs
+					}
+				}
 
 				// Process complete runes and accumulate them
 				var completeRunes []byte
@@ -166,6 +169,7 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 			return LLMResponse{
 				Response: ss,
 				Usage:    tokenUsage,
+				Logprobs: logprobs,
 			}, err
 		} else {
 			// TODO: Is the chicken bit the only way to get here? is that acceptable?
@@ -188,9 +192,19 @@ func ModelInference(ctx context.Context, s string, messages []schema.Message, im
 				response = c.TemplateConfig.ReplyPrefix + response
 			}
 
+			// Parse logprobs from reply if present
+			var logprobs *schema.Logprobs
+			if len(reply.Logprobs) > 0 {
+				var parsedLogprobs schema.Logprobs
+				if err := json.Unmarshal(reply.Logprobs, &parsedLogprobs); err == nil {
+					logprobs = &parsedLogprobs
+				}
+			}
+
 			return LLMResponse{
 				Response: response,
 				Usage:    tokenUsage,
+				Logprobs: logprobs,
 			}, err
 		}
 	}

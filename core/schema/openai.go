@@ -50,10 +50,23 @@ type OpenAIResponse struct {
 
 type Choice struct {
 	Index        int      `json:"index"`
-	FinishReason string   `json:"finish_reason"`
+	FinishReason *string  `json:"finish_reason"`
 	Message      *Message `json:"message,omitempty"`
 	Delta        *Message `json:"delta,omitempty"`
 	Text         string   `json:"text,omitempty"`
+	Logprobs     *Logprobs `json:"logprobs,omitempty"`
+}
+
+type Logprobs struct {
+	Content []LogprobContent `json:"content,omitempty"`
+}
+
+type LogprobContent struct {
+	ID          int32            `json:"id"`
+	Token       string           `json:"token"`
+	Bytes       []int            `json:"bytes,omitempty"`
+	Logprob     float64          `json:"logprob"`
+	TopLogprobs []LogprobContent `json:"top_logprobs,omitempty"`
 }
 
 type Content struct {
@@ -74,39 +87,6 @@ type InputAudio struct {
 	Format string `json:"format" yaml:"format"`
 	// Data holds the base64-encoded audio data.
 	Data string `json:"data" yaml:"data"`
-}
-
-type Message struct {
-	// The message role
-	Role string `json:"role,omitempty" yaml:"role"`
-
-	// The message name (used for tools calls)
-	Name string `json:"name,omitempty" yaml:"name"`
-
-	// The message content
-	Content interface{} `json:"content" yaml:"content"`
-
-	StringContent string   `json:"string_content,omitempty" yaml:"string_content,omitempty"`
-	StringImages  []string `json:"string_images,omitempty" yaml:"string_images,omitempty"`
-	StringVideos  []string `json:"string_videos,omitempty" yaml:"string_videos,omitempty"`
-	StringAudios  []string `json:"string_audios,omitempty" yaml:"string_audios,omitempty"`
-
-	// A result of a function call
-	FunctionCall interface{} `json:"function_call,omitempty" yaml:"function_call,omitempty"`
-
-	ToolCalls []ToolCall `json:"tool_calls,omitempty" yaml:"tool_call,omitempty"`
-}
-
-type ToolCall struct {
-	Index        int          `json:"index"`
-	ID           string       `json:"id"`
-	Type         string       `json:"type"`
-	FunctionCall FunctionCall `json:"function"`
-}
-
-type FunctionCall struct {
-	Name      string `json:"name,omitempty"`
-	Arguments string `json:"arguments"`
 }
 
 type OpenAIModel struct {

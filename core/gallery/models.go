@@ -1,14 +1,15 @@
 package gallery
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"dario.cat/mergo"
-	"github.com/mudler/LocalAI/core/config"
 	lconfig "github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/mudler/LocalAI/pkg/model"
@@ -16,7 +17,7 @@ import (
 	"github.com/mudler/LocalAI/pkg/utils"
 
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 /*
@@ -72,7 +73,8 @@ type PromptTemplate struct {
 
 // Installs a model from the gallery
 func InstallModelFromGallery(
-	modelGalleries, backendGalleries []config.Gallery,
+	ctx context.Context,
+	modelGalleries, backendGalleries []lconfig.Gallery,
 	systemState *system.SystemState,
 	modelLoader *model.ModelLoader,
 	name string, req GalleryModel, downloadStatus func(string, string, string, float64), enforceScan, automaticallyInstallBackend bool) error {
@@ -84,7 +86,7 @@ func InstallModelFromGallery(
 
 		if len(model.URL) > 0 {
 			var err error
-			config, err = GetGalleryConfigFromURL[ModelConfig](model.URL, systemState.Model.ModelsPath)
+			config, err = GetGalleryConfigFromURLWithContext[ModelConfig](ctx, model.URL, systemState.Model.ModelsPath)
 			if err != nil {
 				return err
 			}
@@ -125,7 +127,7 @@ func InstallModelFromGallery(
 			return err
 		}
 
-		installedModel, err := InstallModel(systemState, installName, &config, model.Overrides, downloadStatus, enforceScan)
+		installedModel, err := InstallModel(ctx, systemState, installName, &config, model.Overrides, downloadStatus, enforceScan)
 		if err != nil {
 			return err
 		}
@@ -133,7 +135,7 @@ func InstallModelFromGallery(
 		if automaticallyInstallBackend && installedModel.Backend != "" {
 			log.Debug().Msgf("Installing backend %q", installedModel.Backend)
 
-			if err := InstallBackendFromGallery(backendGalleries, systemState, modelLoader, installedModel.Backend, downloadStatus, false); err != nil {
+			if err := InstallBackendFromGallery(ctx, backendGalleries, systemState, modelLoader, installedModel.Backend, downloadStatus, false); err != nil {
 				return err
 			}
 		}
@@ -154,7 +156,7 @@ func InstallModelFromGallery(
 	return applyModel(model)
 }
 
-func InstallModel(systemState *system.SystemState, nameOverride string, config *ModelConfig, configOverrides map[string]interface{}, downloadStatus func(string, string, string, float64), enforceScan bool) (*lconfig.ModelConfig, error) {
+func InstallModel(ctx context.Context, systemState *system.SystemState, nameOverride string, config *ModelConfig, configOverrides map[string]interface{}, downloadStatus func(string, string, string, float64), enforceScan bool) (*lconfig.ModelConfig, error) {
 	basePath := systemState.Model.ModelsPath
 	// Create base path if it doesn't exist
 	err := os.MkdirAll(basePath, 0750)
@@ -168,6 +170,13 @@ func InstallModel(systemState *system.SystemState, nameOverride string, config *
 
 	// Download files and verify their SHA
 	for i, file := range config.Files {
+		// Check for cancellation before each file
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		log.Debug().Msgf("Checking %q exists and matches SHA", file.Filename)
 
 		if err := utils.VerifyPath(file.Filename, basePath); err != nil {
@@ -185,7 +194,7 @@ func InstallModel(systemState *system.SystemState, nameOverride string, config *
 			}
 		}
 		uri := downloader.URI(file.URI)
-		if err := uri.DownloadFile(filePath, file.SHA256, i, len(config.Files), downloadStatus); err != nil {
+		if err := uri.DownloadFileWithContext(ctx, filePath, file.SHA256, i, len(config.Files), downloadStatus); err != nil {
 			return nil, err
 		}
 	}
@@ -251,8 +260,8 @@ func InstallModel(systemState *system.SystemState, nameOverride string, config *
 			return nil, fmt.Errorf("failed to unmarshal updated config YAML: %v", err)
 		}
 
-		if !modelConfig.Validate() {
-			return nil, fmt.Errorf("failed to validate updated config YAML")
+		if valid, err := modelConfig.Validate(); !valid {
+			return nil, fmt.Errorf("failed to validate updated config YAML: %v", err)
 		}
 
 		err = os.WriteFile(configFilePath, updatedConfigYAML, 0600)
@@ -285,21 +294,32 @@ func GetLocalModelConfiguration(basePath string, name string) (*ModelConfig, err
 	return ReadConfigFile[ModelConfig](galleryFile)
 }
 
-func DeleteModelFromSystem(systemState *system.SystemState, name string) error {
-	additionalFiles := []string{}
+func listModelFiles(systemState *system.SystemState, name string) ([]string, error) {
 
 	configFile := filepath.Join(systemState.Model.ModelsPath, fmt.Sprintf("%s.yaml", name))
 	if err := utils.VerifyPath(configFile, systemState.Model.ModelsPath); err != nil {
-		return fmt.Errorf("failed to verify path %s: %w", configFile, err)
+		return nil, fmt.Errorf("failed to verify path %s: %w", configFile, err)
 	}
+
+	// os.PathSeparator is not allowed in model names. Replace them with "__" to avoid conflicts with file paths.
+	name = strings.ReplaceAll(name, string(os.PathSeparator), "__")
+
+	galleryFile := filepath.Join(systemState.Model.ModelsPath, galleryFileName(name))
+	if err := utils.VerifyPath(galleryFile, systemState.Model.ModelsPath); err != nil {
+		return nil, fmt.Errorf("failed to verify path %s: %w", galleryFile, err)
+	}
+
+	additionalFiles := []string{}
+	allFiles := []string{}
+
 	// Galleryname is the name of the model in this case
 	dat, err := os.ReadFile(configFile)
 	if err == nil {
-		modelConfig := &config.ModelConfig{}
+		modelConfig := &lconfig.ModelConfig{}
 
 		err = yaml.Unmarshal(dat, &modelConfig)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if modelConfig.Model != "" {
 			additionalFiles = append(additionalFiles, modelConfig.ModelFileName())
@@ -310,26 +330,15 @@ func DeleteModelFromSystem(systemState *system.SystemState, name string) error {
 		}
 	}
 
-	// os.PathSeparator is not allowed in model names. Replace them with "__" to avoid conflicts with file paths.
-	name = strings.ReplaceAll(name, string(os.PathSeparator), "__")
-
-	galleryFile := filepath.Join(systemState.Model.ModelsPath, galleryFileName(name))
-	if err := utils.VerifyPath(galleryFile, systemState.Model.ModelsPath); err != nil {
-		return fmt.Errorf("failed to verify path %s: %w", galleryFile, err)
-	}
-
-	var filesToRemove []string
-
-	// Delete all the files associated to the model
 	// read the model config
 	galleryconfig, err := ReadConfigFile[ModelConfig](galleryFile)
 	if err == nil && galleryconfig != nil {
 		for _, f := range galleryconfig.Files {
 			fullPath := filepath.Join(systemState.Model.ModelsPath, f.Filename)
 			if err := utils.VerifyPath(fullPath, systemState.Model.ModelsPath); err != nil {
-				return fmt.Errorf("failed to verify path %s: %w", fullPath, err)
+				return allFiles, fmt.Errorf("failed to verify path %s: %w", fullPath, err)
 			}
-			filesToRemove = append(filesToRemove, fullPath)
+			allFiles = append(allFiles, fullPath)
 		}
 	} else {
 		log.Error().Err(err).Msgf("failed to read gallery file %s", configFile)
@@ -338,18 +347,68 @@ func DeleteModelFromSystem(systemState *system.SystemState, name string) error {
 	for _, f := range additionalFiles {
 		fullPath := filepath.Join(filepath.Join(systemState.Model.ModelsPath, f))
 		if err := utils.VerifyPath(fullPath, systemState.Model.ModelsPath); err != nil {
-			return fmt.Errorf("failed to verify path %s: %w", fullPath, err)
+			return allFiles, fmt.Errorf("failed to verify path %s: %w", fullPath, err)
 		}
-		filesToRemove = append(filesToRemove, fullPath)
+		allFiles = append(allFiles, fullPath)
 	}
 
-	filesToRemove = append(filesToRemove, galleryFile)
+	allFiles = append(allFiles, galleryFile)
 
 	// skip duplicates
-	filesToRemove = utils.Unique(filesToRemove)
+	allFiles = utils.Unique(allFiles)
+
+	return allFiles, nil
+}
+
+func DeleteModelFromSystem(systemState *system.SystemState, name string) error {
+	configFile := filepath.Join(systemState.Model.ModelsPath, fmt.Sprintf("%s.yaml", name))
+
+	filesToRemove, err := listModelFiles(systemState, name)
+	if err != nil {
+		return err
+	}
+
+	allOtherFiles := []string{}
+	// Get all files of all other models
+	fi, err := os.ReadDir(systemState.Model.ModelsPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range fi {
+		if f.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(f.Name(), "._gallery_") {
+			continue
+		}
+		if !strings.HasSuffix(f.Name(), ".yaml") && !strings.HasSuffix(f.Name(), ".yml") {
+			continue
+		}
+		if f.Name() == fmt.Sprintf("%s.yaml", name) || f.Name() == fmt.Sprintf("%s.yml", name) {
+			continue
+		}
+
+		name := strings.TrimSuffix(f.Name(), ".yaml")
+		name = strings.TrimSuffix(name, ".yml")
+
+		log.Debug().Msgf("Checking file %s", f.Name())
+		files, err := listModelFiles(systemState, name)
+		if err != nil {
+			log.Debug().Err(err).Msgf("failed to list files for model %s", f.Name())
+			continue
+		}
+		allOtherFiles = append(allOtherFiles, files...)
+	}
+
+	log.Debug().Msgf("Files to remove: %+v", filesToRemove)
+	log.Debug().Msgf("All other files: %+v", allOtherFiles)
 
 	// Removing files
 	for _, f := range filesToRemove {
+		if slices.Contains(allOtherFiles, f) {
+			log.Debug().Msgf("Skipping file %s because it is part of another model", f)
+			continue
+		}
 		if e := os.Remove(f); e != nil {
 			log.Error().Err(e).Msgf("failed to remove file %s", f)
 		}
@@ -360,7 +419,7 @@ func DeleteModelFromSystem(systemState *system.SystemState, name string) error {
 
 // This is ***NEVER*** going to be perfect or finished.
 // This is a BEST EFFORT function to surface known-vulnerable models to users.
-func SafetyScanGalleryModels(galleries []config.Gallery, systemState *system.SystemState) error {
+func SafetyScanGalleryModels(galleries []lconfig.Gallery, systemState *system.SystemState) error {
 	galleryModels, err := AvailableGalleryModels(galleries, systemState)
 	if err != nil {
 		return err

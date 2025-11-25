@@ -1,10 +1,10 @@
-name: Bump dependencies
+name: Bump Documentation
 on:
   schedule:
     - cron: 0 20 * * *
   workflow_dispatch:
 jobs:
-  bump:
+  bump-docs:
     strategy:
       fail-fast: false
       matrix:
@@ -12,7 +12,7 @@ jobs:
           - repository: "mudler/LocalAI"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Bump dependencies 🔧
         run: |
           bash .github/bump_docs.sh ${{ matrix.repository }}

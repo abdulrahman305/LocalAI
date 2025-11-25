@@ -1,15 +1,18 @@
 package gallery
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/mudler/LocalAI/pkg/system"
+	"github.com/mudler/LocalAI/pkg/xsync"
 	"github.com/rs/zerolog/log"
 
 	"gopkg.in/yaml.v2"
@@ -18,7 +21,20 @@ import (
 func GetGalleryConfigFromURL[T any](url string, basePath string) (T, error) {
 	var config T
 	uri := downloader.URI(url)
-	err := uri.DownloadWithCallback(basePath, func(url string, d []byte) error {
+	err := uri.ReadWithCallback(basePath, func(url string, d []byte) error {
+		return yaml.Unmarshal(d, &config)
+	})
+	if err != nil {
+		log.Error().Err(err).Str("url", url).Msg("failed to get gallery config for url")
+		return config, err
+	}
+	return config, nil
+}
+
+func GetGalleryConfigFromURLWithContext[T any](ctx context.Context, url string, basePath string) (T, error) {
+	var config T
+	uri := downloader.URI(url)
+	err := uri.ReadWithAuthorizationAndCallback(ctx, basePath, "", func(url string, d []byte) error {
 		return yaml.Unmarshal(d, &config)
 	})
 	if err != nil {
@@ -61,12 +77,15 @@ func (gm GalleryElements[T]) Search(term string) GalleryElements[T] {
 	term = strings.ToLower(term)
 	for _, m := range gm {
 		if fuzzy.Match(term, strings.ToLower(m.GetName())) ||
-			fuzzy.Match(term, strings.ToLower(m.GetDescription())) ||
 			fuzzy.Match(term, strings.ToLower(m.GetGallery().Name)) ||
+			strings.Contains(strings.ToLower(m.GetName()), term) ||
+			strings.Contains(strings.ToLower(m.GetDescription()), term) ||
+			strings.Contains(strings.ToLower(m.GetGallery().Name), term) ||
 			strings.Contains(strings.ToLower(strings.Join(m.GetTags(), ",")), term) {
 			filteredModels = append(filteredModels, m)
 		}
 	}
+
 	return filteredModels
 }
 
@@ -124,7 +143,7 @@ func AvailableGalleryModels(galleries []config.Gallery, systemState *system.Syst
 
 	// Get models from galleries
 	for _, gallery := range galleries {
-		galleryModels, err := getGalleryElements[*GalleryModel](gallery, systemState.Model.ModelsPath, func(model *GalleryModel) bool {
+		galleryModels, err := getGalleryElements(gallery, systemState.Model.ModelsPath, func(model *GalleryModel) bool {
 			if _, err := os.Stat(filepath.Join(systemState.Model.ModelsPath, fmt.Sprintf("%s.yaml", model.GetName()))); err == nil {
 				return true
 			}
@@ -165,7 +184,7 @@ func AvailableBackends(galleries []config.Gallery, systemState *system.SystemSta
 func findGalleryURLFromReferenceURL(url string, basePath string) (string, error) {
 	var refFile string
 	uri := downloader.URI(url)
-	err := uri.DownloadWithCallback(basePath, func(url string, d []byte) error {
+	err := uri.ReadWithCallback(basePath, func(url string, d []byte) error {
 		refFile = string(d)
 		if len(refFile) == 0 {
 			return fmt.Errorf("invalid reference file at url %s: %s", url, d)
@@ -177,6 +196,17 @@ func findGalleryURLFromReferenceURL(url string, basePath string) (string, error)
 	return refFile, err
 }
 
+type galleryCacheEntry struct {
+	yamlEntry   []byte
+	lastUpdated time.Time
+}
+
+func (entry galleryCacheEntry) hasExpired() bool {
+	return entry.lastUpdated.Before(time.Now().Add(-1 * time.Hour))
+}
+
+var galleryCache = xsync.NewSyncedMap[string, galleryCacheEntry]()
+
 func getGalleryElements[T GalleryElement](gallery config.Gallery, basePath string, isInstalledCallback func(T) bool) ([]T, error) {
 	var models []T = []T{}
 
@@ -187,16 +217,37 @@ func getGalleryElements[T GalleryElement](gallery config.Gallery, basePath strin
 			return models, err
 		}
 	}
+
+	cacheKey := fmt.Sprintf("%s-%s", gallery.Name, gallery.URL)
+	if galleryCache.Exists(cacheKey) {
+		entry := galleryCache.Get(cacheKey)
+		// refresh if last updated is more than 1 hour ago
+		if !entry.hasExpired() {
+			err := yaml.Unmarshal(entry.yamlEntry, &models)
+			if err != nil {
+				return models, err
+			}
+		} else {
+			galleryCache.Delete(cacheKey)
+		}
+	}
+
 	uri := downloader.URI(gallery.URL)
 
-	err := uri.DownloadWithCallback(basePath, func(url string, d []byte) error {
-		return yaml.Unmarshal(d, &models)
-	})
-	if err != nil {
-		if yamlErr, ok := err.(*yaml.TypeError); ok {
-			log.Debug().Msgf("YAML errors: %s\n\nwreckage of models: %+v", strings.Join(yamlErr.Errors, "\n"), models)
+	if len(models) == 0 {
+		err := uri.ReadWithCallback(basePath, func(url string, d []byte) error {
+			galleryCache.Set(cacheKey, galleryCacheEntry{
+				yamlEntry:   d,
+				lastUpdated: time.Now(),
+			})
+			return yaml.Unmarshal(d, &models)
+		})
+		if err != nil {
+			if yamlErr, ok := err.(*yaml.TypeError); ok {
+				log.Debug().Msgf("YAML errors: %s\n\nwreckage of models: %+v", strings.Join(yamlErr.Errors, "\n"), models)
+			}
+			return models, fmt.Errorf("failed to read gallery elements: %w", err)
 		}
-		return models, err
 	}
 
 	// Add gallery to models

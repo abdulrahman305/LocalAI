@@ -15,7 +15,7 @@ jobs:
         MODEL_NAME: gemma-3-12b-it-qat
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0 # needed to checkout all branches for this Action to work
         ref: ${{ github.event.pull_request.head.sha }} # Checkout the PR head to get the actual changes
@@ -84,7 +84,7 @@ jobs:
         args: ${{ steps.summarize.outputs.message }}
     - name: Setup tmate session if fails
       if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3.22
+      uses: mxschmitt/action-tmate@v3.23
       with:
         detached: true
         connect-timeout-seconds: 180
@@ -95,7 +95,7 @@ jobs:
         MODEL_NAME: gemma-3-12b-it-qat
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0 # needed to checkout all branches for this Action to work
         ref: ${{ github.event.pull_request.head.sha }} # Checkout the PR head to get the actual changes
@@ -167,7 +167,7 @@ jobs:
         TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
     - name: Setup tmate session if fails
       if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3.22
+      uses: mxschmitt/action-tmate@v3.23
       with:
         detached: true
         connect-timeout-seconds: 180

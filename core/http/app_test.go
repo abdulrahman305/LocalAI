@@ -10,13 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/mudler/LocalAI/core/application"
 	"github.com/mudler/LocalAI/core/config"
 	. "github.com/mudler/LocalAI/core/http"
 	"github.com/mudler/LocalAI/core/schema"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/labstack/echo/v4"
 	"github.com/mudler/LocalAI/core/gallery"
 	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/mudler/LocalAI/pkg/system"
@@ -25,6 +26,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	openaigo "github.com/otiai10/openaigo"
+	"github.com/rs/zerolog/log"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -85,7 +87,7 @@ func getModels(url string) ([]gallery.GalleryModel, error) {
 	response := []gallery.GalleryModel{}
 	uri := downloader.URI(url)
 	// TODO: No tests currently seem to exercise file:// urls. Fix?
-	err := uri.DownloadWithAuthorizationAndCallback("", bearerKey, func(url string, i []byte) error {
+	err := uri.ReadWithAuthorizationAndCallback(context.TODO(), "", bearerKey, func(url string, i []byte) error {
 		// Unmarshal YAML data into a struct
 		return json.Unmarshal(i, &response)
 	})
@@ -266,7 +268,7 @@ const bertEmbeddingsURL = `https://gist.githubusercontent.com/mudler/0a080b166b8
 
 var _ = Describe("API test", func() {
 
-	var app *fiber.App
+	var app *echo.Echo
 	var client *openai.Client
 	var client2 *openaigo.Client
 	var c context.Context
@@ -339,7 +341,11 @@ var _ = Describe("API test", func() {
 			app, err = API(application)
 			Expect(err).ToNot(HaveOccurred())
 
-			go app.Listen("127.0.0.1:9090")
+			go func() {
+				if err := app.Start("127.0.0.1:9090"); err != nil && err != http.ErrServerClosed {
+					log.Error().Err(err).Msg("server error")
+				}
+			}()
 
 			defaultConfig := openai.DefaultConfig(apiKey)
 			defaultConfig.BaseURL = "http://127.0.0.1:9090/v1"
@@ -358,7 +364,9 @@ var _ = Describe("API test", func() {
 		AfterEach(func(sc SpecContext) {
 			cancel()
 			if app != nil {
-				err := app.Shutdown()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := app.Shutdown(ctx)
 				Expect(err).ToNot(HaveOccurred())
 			}
 			err := os.RemoveAll(tmpdir)
@@ -505,6 +513,124 @@ var _ = Describe("API test", func() {
 			})
 
 		})
+
+		Context("Importing models from URI", func() {
+			var testYamlFile string
+
+			BeforeEach(func() {
+				// Create a test YAML config file
+				yamlContent := `name: test-import-model
+backend: llama-cpp
+description: Test model imported from file URI
+parameters:
+  model: path/to/model.gguf
+  temperature: 0.7
+`
+				testYamlFile = filepath.Join(tmpdir, "test-import.yaml")
+				err := os.WriteFile(testYamlFile, []byte(yamlContent), 0644)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				err := os.Remove(testYamlFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should import model from file:// URI pointing to local YAML config", func() {
+				importReq := schema.ImportModelRequest{
+					URI:         "file://" + testYamlFile,
+					Preferences: json.RawMessage(`{}`),
+				}
+
+				var response schema.GalleryResponse
+				err := postRequestResponseJSON("http://127.0.0.1:9090/models/import-uri", &importReq, &response)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(response.ID).ToNot(BeEmpty())
+
+				uuid := response.ID
+				resp := map[string]interface{}{}
+				Eventually(func() bool {
+					response := getModelStatus("http://127.0.0.1:9090/models/jobs/" + uuid)
+					resp = response
+					return response["processed"].(bool)
+				}, "360s", "10s").Should(Equal(true))
+
+				// Check that the model was imported successfully
+				Expect(resp["message"]).ToNot(ContainSubstring("error"))
+				Expect(resp["error"]).To(BeNil())
+
+				// Verify the model config file was created
+				dat, err := os.ReadFile(filepath.Join(modelDir, "test-import-model.yaml"))
+				Expect(err).ToNot(HaveOccurred())
+
+				content := map[string]interface{}{}
+				err = yaml.Unmarshal(dat, &content)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(content["name"]).To(Equal("test-import-model"))
+				Expect(content["backend"]).To(Equal("llama-cpp"))
+			})
+
+			It("should return error when file:// URI points to non-existent file", func() {
+				nonExistentFile := filepath.Join(tmpdir, "nonexistent.yaml")
+				importReq := schema.ImportModelRequest{
+					URI:         "file://" + nonExistentFile,
+					Preferences: json.RawMessage(`{}`),
+				}
+
+				var response schema.GalleryResponse
+				err := postRequestResponseJSON("http://127.0.0.1:9090/models/import-uri", &importReq, &response)
+				// The endpoint should return an error immediately
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to discover model config"))
+			})
+		})
+
+		Context("Importing models from URI can't point to absolute paths", func() {
+			var testYamlFile string
+
+			BeforeEach(func() {
+				// Create a test YAML config file
+				yamlContent := `name: test-import-model
+backend: llama-cpp
+description: Test model imported from file URI
+parameters:
+  model: /path/to/model.gguf
+  temperature: 0.7
+`
+				testYamlFile = filepath.Join(tmpdir, "test-import.yaml")
+				err := os.WriteFile(testYamlFile, []byte(yamlContent), 0644)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				err := os.Remove(testYamlFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should fail to import model from file:// URI pointing to local YAML config", func() {
+				importReq := schema.ImportModelRequest{
+					URI:         "file://" + testYamlFile,
+					Preferences: json.RawMessage(`{}`),
+				}
+
+				var response schema.GalleryResponse
+				err := postRequestResponseJSON("http://127.0.0.1:9090/models/import-uri", &importReq, &response)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(response.ID).ToNot(BeEmpty())
+
+				uuid := response.ID
+				resp := map[string]interface{}{}
+				Eventually(func() bool {
+					response := getModelStatus("http://127.0.0.1:9090/models/jobs/" + uuid)
+					resp = response
+					return response["processed"].(bool)
+				}, "360s", "10s").Should(Equal(true))
+
+				// Check that the model was imported successfully
+				Expect(resp["message"]).To(ContainSubstring("error"))
+				Expect(resp["error"]).ToNot(BeNil())
+			})
+		})
 	})
 
 	Context("Model gallery", func() {
@@ -547,7 +673,11 @@ var _ = Describe("API test", func() {
 			app, err = API(application)
 			Expect(err).ToNot(HaveOccurred())
 
-			go app.Listen("127.0.0.1:9090")
+			go func() {
+				if err := app.Start("127.0.0.1:9090"); err != nil && err != http.ErrServerClosed {
+					log.Error().Err(err).Msg("server error")
+				}
+			}()
 
 			defaultConfig := openai.DefaultConfig("")
 			defaultConfig.BaseURL = "http://127.0.0.1:9090/v1"
@@ -566,7 +696,9 @@ var _ = Describe("API test", func() {
 		AfterEach(func() {
 			cancel()
 			if app != nil {
-				err := app.Shutdown()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := app.Shutdown(ctx)
 				Expect(err).ToNot(HaveOccurred())
 			}
 			err := os.RemoveAll(tmpdir)
@@ -755,7 +887,11 @@ var _ = Describe("API test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			app, err = API(application)
 			Expect(err).ToNot(HaveOccurred())
-			go app.Listen("127.0.0.1:9090")
+			go func() {
+				if err := app.Start("127.0.0.1:9090"); err != nil && err != http.ErrServerClosed {
+					log.Error().Err(err).Msg("server error")
+				}
+			}()
 
 			defaultConfig := openai.DefaultConfig("")
 			defaultConfig.BaseURL = "http://127.0.0.1:9090/v1"
@@ -773,7 +909,9 @@ var _ = Describe("API test", func() {
 		AfterEach(func() {
 			cancel()
 			if app != nil {
-				err := app.Shutdown()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := app.Shutdown(ctx)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
@@ -794,6 +932,83 @@ var _ = Describe("API test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(resp.Choices)).To(Equal(1))
 			Expect(resp.Choices[0].Message.Content).ToNot(BeEmpty())
+		})
+
+		It("returns logprobs in chat completions when requested", func() {
+			topLogprobsVal := 3
+			response, err := client.CreateChatCompletion(context.TODO(), openai.ChatCompletionRequest{
+				Model:       "testmodel.ggml",
+				LogProbs:    true,
+				TopLogProbs: topLogprobsVal,
+				Messages:    []openai.ChatCompletionMessage{{Role: "user", Content: testPrompt}}})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(len(response.Choices)).To(Equal(1))
+			Expect(response.Choices[0].Message).ToNot(BeNil())
+			Expect(response.Choices[0].Message.Content).ToNot(BeEmpty())
+
+			// Verify logprobs are present and have correct structure
+			Expect(response.Choices[0].LogProbs).ToNot(BeNil())
+			Expect(response.Choices[0].LogProbs.Content).ToNot(BeEmpty())
+
+			Expect(len(response.Choices[0].LogProbs.Content)).To(BeNumerically(">", 1))
+
+			foundatLeastToken := ""
+			foundAtLeastBytes := []byte{}
+			foundAtLeastTopLogprobBytes := []byte{}
+			foundatLeastTopLogprob := ""
+			// Verify logprobs content structure matches OpenAI format
+			for _, logprobContent := range response.Choices[0].LogProbs.Content {
+				// Bytes can be empty for certain tokens (special tokens, etc.), so we don't require it
+				if len(logprobContent.Bytes) > 0 {
+					foundAtLeastBytes = logprobContent.Bytes
+				}
+				if len(logprobContent.Token) > 0 {
+					foundatLeastToken = logprobContent.Token
+				}
+				Expect(logprobContent.LogProb).To(BeNumerically("<=", 0)) // Logprobs are always <= 0
+				Expect(len(logprobContent.TopLogProbs)).To(BeNumerically(">", 1))
+
+				// If top_logprobs is requested, verify top_logprobs array respects the limit
+				if len(logprobContent.TopLogProbs) > 0 {
+					// Should respect top_logprobs limit (3 in this test)
+					Expect(len(logprobContent.TopLogProbs)).To(BeNumerically("<=", topLogprobsVal))
+					for _, topLogprob := range logprobContent.TopLogProbs {
+						if len(topLogprob.Bytes) > 0 {
+							foundAtLeastTopLogprobBytes = topLogprob.Bytes
+						}
+						if len(topLogprob.Token) > 0 {
+							foundatLeastTopLogprob = topLogprob.Token
+						}
+						Expect(topLogprob.LogProb).To(BeNumerically("<=", 0))
+					}
+				}
+			}
+
+			Expect(foundAtLeastBytes).ToNot(BeEmpty())
+			Expect(foundAtLeastTopLogprobBytes).ToNot(BeEmpty())
+			Expect(foundatLeastToken).ToNot(BeEmpty())
+			Expect(foundatLeastTopLogprob).ToNot(BeEmpty())
+		})
+
+		It("applies logit_bias to chat completions when requested", func() {
+			// logit_bias is a map of token IDs (as strings) to bias values (-100 to 100)
+			// According to OpenAI API: modifies the likelihood of specified tokens appearing in the completion
+			logitBias := map[string]int{
+				"15043": 1, // Bias token ID 15043 (example token ID) with bias value 1
+			}
+			response, err := client.CreateChatCompletion(context.TODO(), openai.ChatCompletionRequest{
+				Model:     "testmodel.ggml",
+				Messages:  []openai.ChatCompletionMessage{{Role: "user", Content: testPrompt}},
+				LogitBias: logitBias,
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(response.Choices)).To(Equal(1))
+			Expect(response.Choices[0].Message).ToNot(BeNil())
+			Expect(response.Choices[0].Message.Content).ToNot(BeEmpty())
+			// If logit_bias is applied, the response should be generated successfully
+			// We can't easily verify the bias effect without knowing the actual token IDs for the model,
+			// but the fact that the request succeeds confirms the API accepts and processes logit_bias
 		})
 
 		It("returns errors", func() {
@@ -984,6 +1199,9 @@ var _ = Describe("API test", func() {
 
 	Context("Config file", func() {
 		BeforeEach(func() {
+			if runtime.GOOS != "linux" {
+				Skip("run this test only on linux")
+			}
 			modelPath := os.Getenv("MODELS_PATH")
 			backendPath := os.Getenv("BACKENDS_PATH")
 			c, cancel = context.WithCancel(context.Background())
@@ -1006,7 +1224,11 @@ var _ = Describe("API test", func() {
 			app, err = API(application)
 			Expect(err).ToNot(HaveOccurred())
 
-			go app.Listen("127.0.0.1:9090")
+			go func() {
+				if err := app.Start("127.0.0.1:9090"); err != nil && err != http.ErrServerClosed {
+					log.Error().Err(err).Msg("server error")
+				}
+			}()
 
 			defaultConfig := openai.DefaultConfig("")
 			defaultConfig.BaseURL = "http://127.0.0.1:9090/v1"
@@ -1022,7 +1244,9 @@ var _ = Describe("API test", func() {
 		AfterEach(func() {
 			cancel()
 			if app != nil {
-				err := app.Shutdown()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := app.Shutdown(ctx)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})

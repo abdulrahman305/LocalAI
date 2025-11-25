@@ -3,7 +3,9 @@
 package gallery
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -68,7 +70,7 @@ func writeBackendMetadata(backendPath string, metadata *BackendMetadata) error {
 }
 
 // InstallBackendFromGallery installs a backend from the gallery.
-func InstallBackendFromGallery(galleries []config.Gallery, systemState *system.SystemState, modelLoader *model.ModelLoader, name string, downloadStatus func(string, string, string, float64), force bool) error {
+func InstallBackendFromGallery(ctx context.Context, galleries []config.Gallery, systemState *system.SystemState, modelLoader *model.ModelLoader, name string, downloadStatus func(string, string, string, float64), force bool) error {
 	if !force {
 		// check if we already have the backend installed
 		backends, err := ListSystemBackends(systemState)
@@ -108,7 +110,7 @@ func InstallBackendFromGallery(galleries []config.Gallery, systemState *system.S
 		log.Debug().Str("name", name).Str("bestBackend", bestBackend.Name).Msg("Installing backend from meta backend")
 
 		// Then, let's install the best backend
-		if err := InstallBackend(systemState, modelLoader, bestBackend, downloadStatus); err != nil {
+		if err := InstallBackend(ctx, systemState, modelLoader, bestBackend, downloadStatus); err != nil {
 			return err
 		}
 
@@ -133,10 +135,10 @@ func InstallBackendFromGallery(galleries []config.Gallery, systemState *system.S
 		return nil
 	}
 
-	return InstallBackend(systemState, modelLoader, backend, downloadStatus)
+	return InstallBackend(ctx, systemState, modelLoader, backend, downloadStatus)
 }
 
-func InstallBackend(systemState *system.SystemState, modelLoader *model.ModelLoader, config *GalleryBackend, downloadStatus func(string, string, string, float64)) error {
+func InstallBackend(ctx context.Context, systemState *system.SystemState, modelLoader *model.ModelLoader, config *GalleryBackend, downloadStatus func(string, string, string, float64)) error {
 	// Create base path if it doesn't exist
 	err := os.MkdirAll(systemState.Backend.BackendsPath, 0750)
 	if err != nil {
@@ -162,21 +164,38 @@ func InstallBackend(systemState *system.SystemState, modelLoader *model.ModelLoa
 			return fmt.Errorf("failed copying: %w", err)
 		}
 	} else {
-		uri := downloader.URI(config.URI)
-		if err := uri.DownloadFile(backendPath, "", 1, 1, downloadStatus); err != nil {
+		log.Debug().Str("uri", config.URI).Str("backendPath", backendPath).Msg("Downloading backend")
+		if err := uri.DownloadFileWithContext(ctx, backendPath, "", 1, 1, downloadStatus); err != nil {
 			success := false
 			// Try to download from mirrors
 			for _, mirror := range config.Mirrors {
-				if err := downloader.URI(mirror).DownloadFile(backendPath, "", 1, 1, downloadStatus); err == nil {
+				// Check for cancellation before trying next mirror
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+				if err := downloader.URI(mirror).DownloadFileWithContext(ctx, backendPath, "", 1, 1, downloadStatus); err == nil {
 					success = true
+					log.Debug().Str("uri", config.URI).Str("backendPath", backendPath).Msg("Downloaded backend")
 					break
 				}
 			}
 
 			if !success {
+				log.Error().Str("uri", config.URI).Str("backendPath", backendPath).Err(err).Msg("Failed to download backend")
 				return fmt.Errorf("failed to download backend %q: %v", config.URI, err)
 			}
+		} else {
+			log.Debug().Str("uri", config.URI).Str("backendPath", backendPath).Msg("Downloaded backend")
 		}
+	}
+
+	// sanity check - check if runfile is present
+	runFile := filepath.Join(backendPath, runFile)
+	if _, err := os.Stat(runFile); os.IsNotExist(err) {
+		log.Error().Str("runFile", runFile).Msg("Run file not found")
+		return fmt.Errorf("not a valid backend: run file not found %q", runFile)
 	}
 
 	// Create metadata for the backend
@@ -310,8 +329,10 @@ func ListSystemBackends(systemState *system.SystemState) (SystemBackends, error)
 				}
 			}
 		}
-	} else {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		log.Warn().Err(err).Msg("Failed to read system backends, proceeding with user-managed backends")
+	} else if errors.Is(err, os.ErrNotExist) {
+		log.Debug().Msg("No system backends found")
 	}
 
 	// User-managed backends and alias collection

@@ -1,14 +1,12 @@
 package openai
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 	"github.com/mudler/LocalAI/core/backend"
 	"github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/core/http/middleware"
@@ -19,7 +17,6 @@ import (
 	"github.com/mudler/LocalAI/pkg/model"
 
 	"github.com/rs/zerolog/log"
-	"github.com/valyala/fasthttp"
 )
 
 // ChatEndpoint is the OpenAI Completion API endpoint https://platform.openai.com/docs/api-reference/chat/create
@@ -27,7 +24,7 @@ import (
 // @Param request body schema.OpenAIRequest true "query params"
 // @Success 200 {object} schema.OpenAIResponse "Response"
 // @Router /v1/chat/completions [post]
-func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator *templates.Evaluator, startupOptions *config.ApplicationConfig) func(c *fiber.Ctx) error {
+func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator *templates.Evaluator, startupOptions *config.ApplicationConfig) echo.HandlerFunc {
 	var id, textContentToReturn string
 	var created int
 
@@ -36,7 +33,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			ID:      id,
 			Created: created,
 			Model:   req.Model, // we have to return what the user sent here, due to OpenAI spec.
-			Choices: []schema.Choice{{Delta: &schema.Message{Role: "assistant", Content: &textContentToReturn}}},
+			Choices: []schema.Choice{{Delta: &schema.Message{Role: "assistant"}, Index: 0, FinishReason: nil}},
 			Object:  "chat.completion.chunk",
 		}
 		responses <- initialMessage
@@ -56,7 +53,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				ID:      id,
 				Created: created,
 				Model:   req.Model, // we have to return what the user sent here, due to OpenAI spec.
-				Choices: []schema.Choice{{Delta: &schema.Message{Content: &s}, Index: 0}},
+				Choices: []schema.Choice{{Delta: &schema.Message{Content: &s}, Index: 0, FinishReason: nil}},
 				Object:  "chat.completion.chunk",
 				Usage:   usage,
 			}
@@ -90,7 +87,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				ID:      id,
 				Created: created,
 				Model:   req.Model, // we have to return what the user sent here, due to OpenAI spec.
-				Choices: []schema.Choice{{Delta: &schema.Message{Role: "assistant", Content: &textContentToReturn}}},
+				Choices: []schema.Choice{{Delta: &schema.Message{Role: "assistant"}, Index: 0, FinishReason: nil}},
 				Object:  "chat.completion.chunk",
 			}
 			responses <- initialMessage
@@ -114,7 +111,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				ID:      id,
 				Created: created,
 				Model:   req.Model, // we have to return what the user sent here, due to OpenAI spec.
-				Choices: []schema.Choice{{Delta: &schema.Message{Content: &result}, Index: 0}},
+				Choices: []schema.Choice{{Delta: &schema.Message{Content: &result}, Index: 0, FinishReason: nil}},
 				Object:  "chat.completion.chunk",
 				Usage:   usage,
 			}
@@ -142,7 +139,10 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 									},
 								},
 							},
-						}}},
+						},
+						Index:        0,
+						FinishReason: nil,
+					}},
 					Object: "chat.completion.chunk",
 				}
 				responses <- initialMessage
@@ -165,7 +165,10 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 									},
 								},
 							},
-						}}},
+						},
+						Index:        0,
+						FinishReason: nil,
+					}},
 					Object: "chat.completion.chunk",
 				}
 			}
@@ -175,21 +178,21 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 		return err
 	}
 
-	return func(c *fiber.Ctx) error {
+	return func(c echo.Context) error {
 		textContentToReturn = ""
 		id = uuid.New().String()
 		created = int(time.Now().Unix())
 
-		input, ok := c.Locals(middleware.CONTEXT_LOCALS_KEY_LOCALAI_REQUEST).(*schema.OpenAIRequest)
+		input, ok := c.Get(middleware.CONTEXT_LOCALS_KEY_LOCALAI_REQUEST).(*schema.OpenAIRequest)
 		if !ok || input.Model == "" {
-			return fiber.ErrBadRequest
+			return echo.ErrBadRequest
 		}
 
-		extraUsage := c.Get("Extra-Usage", "") != ""
+		extraUsage := c.Request().Header.Get("Extra-Usage") != ""
 
-		config, ok := c.Locals(middleware.CONTEXT_LOCALS_KEY_MODEL_CONFIG).(*config.ModelConfig)
+		config, ok := c.Get(middleware.CONTEXT_LOCALS_KEY_MODEL_CONFIG).(*config.ModelConfig)
 		if !ok || config == nil {
-			return fiber.ErrBadRequest
+			return echo.ErrBadRequest
 		}
 
 		log.Debug().Msgf("Chat endpoint configuration read: %+v", config)
@@ -217,6 +220,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			noActionDescription = config.FunctionsConfig.NoActionDescriptionName
 		}
 
+		// If we are using a response format, we need to generate a grammar for it
 		if config.ResponseFormatMap != nil {
 			d := schema.ChatCompletionResponseFormat{}
 			dat, err := json.Marshal(config.ResponseFormatMap)
@@ -260,6 +264,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 		}
 
 		switch {
+		// Generates grammar with internal's LocalAI engine
 		case (!config.FunctionsConfig.GrammarConfig.NoGrammar || strictMode) && shouldUseFn:
 			noActionGrammar := functions.Function{
 				Name:        noActionName,
@@ -283,7 +288,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				funcs = funcs.Select(config.FunctionToCall())
 			}
 
-			// Update input grammar
+			// Update input grammar or json_schema based on use_llama_grammar option
 			jsStruct := funcs.ToJSONStructure(config.FunctionsConfig.FunctionNameKey, config.FunctionsConfig.FunctionNameKey)
 			g, err := jsStruct.Grammar(config.FunctionsConfig.GrammarOptions()...)
 			if err == nil {
@@ -298,6 +303,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			} else {
 				log.Error().Err(err).Msg("Failed generating grammar")
 			}
+
 		default:
 			// Force picking one of the functions by the request
 			if config.FunctionToCall() != "" {
@@ -316,7 +322,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 
 		// If we are using the tokenizer template, we don't need to process the messages
 		// unless we are processing functions
-		if !config.TemplateConfig.UseTokenizerTemplate || shouldUseFn {
+		if !config.TemplateConfig.UseTokenizerTemplate {
 			predInput = evaluator.TemplateMessages(*input, input.Messages, config, funcs, shouldUseFn)
 
 			log.Debug().Msgf("Prompt (after templating): %s", predInput)
@@ -329,13 +335,10 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 		case toStream:
 
 			log.Debug().Msgf("Stream request received")
-			c.Context().SetContentType("text/event-stream")
-			//c.Response().Header.SetContentType(fiber.MIMETextHTMLCharsetUTF8)
-			//	c.Set("Content-Type", "text/event-stream")
-			c.Set("Cache-Control", "no-cache")
-			c.Set("Connection", "keep-alive")
-			c.Set("Transfer-Encoding", "chunked")
-			c.Set("X-Correlation-ID", id)
+			c.Response().Header().Set("Content-Type", "text/event-stream")
+			c.Response().Header().Set("Cache-Control", "no-cache")
+			c.Response().Header().Set("Connection", "keep-alive")
+			c.Response().Header().Set("X-Correlation-ID", id)
 
 			responses := make(chan schema.OpenAIResponse)
 			ended := make(chan error, 1)
@@ -348,89 +351,101 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				}
 			}()
 
-			c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
-				usage := &schema.OpenAIUsage{}
-				toolsCalled := false
+			usage := &schema.OpenAIUsage{}
+			toolsCalled := false
 
-			LOOP:
-				for {
-					select {
-					case ev := <-responses:
-						if len(ev.Choices) == 0 {
-							log.Debug().Msgf("No choices in the response, skipping")
-							continue
-						}
-						usage = &ev.Usage // Copy a pointer to the latest usage chunk so that the stop message can reference it
-						if len(ev.Choices[0].Delta.ToolCalls) > 0 {
-							toolsCalled = true
-						}
-						var buf bytes.Buffer
-						enc := json.NewEncoder(&buf)
-						enc.Encode(ev)
-						log.Debug().Msgf("Sending chunk: %s", buf.String())
-						_, err := fmt.Fprintf(w, "data: %v\n", buf.String())
-						if err != nil {
-							log.Debug().Msgf("Sending chunk failed: %v", err)
-							input.Cancel()
-						}
-						w.Flush()
-					case err := <-ended:
-						if err == nil {
-							break LOOP
-						}
-						log.Error().Msgf("Stream ended with error: %v", err)
-
-						resp := &schema.OpenAIResponse{
-							ID:      id,
-							Created: created,
-							Model:   input.Model, // we have to return what the user sent here, due to OpenAI spec.
-							Choices: []schema.Choice{
-								{
-									FinishReason: "stop",
-									Index:        0,
-									Delta:        &schema.Message{Content: "Internal error: " + err.Error()},
-								}},
-							Object: "chat.completion.chunk",
-							Usage:  *usage,
-						}
-						respData, _ := json.Marshal(resp)
-
-						w.WriteString(fmt.Sprintf("data: %s\n\n", respData))
-						w.WriteString("data: [DONE]\n\n")
-						w.Flush()
-
-						return
+		LOOP:
+			for {
+				select {
+				case <-input.Context.Done():
+					// Context was cancelled (client disconnected or request cancelled)
+					log.Debug().Msgf("Request context cancelled, stopping stream")
+					input.Cancel()
+					break LOOP
+				case ev := <-responses:
+					if len(ev.Choices) == 0 {
+						log.Debug().Msgf("No choices in the response, skipping")
+						continue
 					}
+					usage = &ev.Usage // Copy a pointer to the latest usage chunk so that the stop message can reference it
+					if len(ev.Choices[0].Delta.ToolCalls) > 0 {
+						toolsCalled = true
+					}
+					respData, err := json.Marshal(ev)
+					if err != nil {
+						log.Debug().Msgf("Failed to marshal response: %v", err)
+						input.Cancel()
+						continue
+					}
+					log.Debug().Msgf("Sending chunk: %s", string(respData))
+					_, err = fmt.Fprintf(c.Response().Writer, "data: %s\n\n", string(respData))
+					if err != nil {
+						log.Debug().Msgf("Sending chunk failed: %v", err)
+						input.Cancel()
+						return err
+					}
+					c.Response().Flush()
+				case err := <-ended:
+					if err == nil {
+						break LOOP
+					}
+					log.Error().Msgf("Stream ended with error: %v", err)
+
+					stopReason := FinishReasonStop
+					resp := &schema.OpenAIResponse{
+						ID:      id,
+						Created: created,
+						Model:   input.Model, // we have to return what the user sent here, due to OpenAI spec.
+						Choices: []schema.Choice{
+							{
+								FinishReason: &stopReason,
+								Index:        0,
+								Delta:        &schema.Message{Content: "Internal error: " + err.Error()},
+							}},
+						Object: "chat.completion.chunk",
+						Usage:  *usage,
+					}
+					respData, marshalErr := json.Marshal(resp)
+					if marshalErr != nil {
+						log.Error().Msgf("Failed to marshal error response: %v", marshalErr)
+						// Send a simple error message as fallback
+						fmt.Fprintf(c.Response().Writer, "data: {\"error\":\"Internal error\"}\n\n")
+					} else {
+						fmt.Fprintf(c.Response().Writer, "data: %s\n\n", respData)
+					}
+					fmt.Fprintf(c.Response().Writer, "data: [DONE]\n\n")
+					c.Response().Flush()
+
+					return nil
 				}
+			}
 
-				finishReason := "stop"
-				if toolsCalled && len(input.Tools) > 0 {
-					finishReason = "tool_calls"
-				} else if toolsCalled {
-					finishReason = "function_call"
-				}
+			finishReason := FinishReasonStop
+			if toolsCalled && len(input.Tools) > 0 {
+				finishReason = FinishReasonToolCalls
+			} else if toolsCalled {
+				finishReason = FinishReasonFunctionCall
+			}
 
-				resp := &schema.OpenAIResponse{
-					ID:      id,
-					Created: created,
-					Model:   input.Model, // we have to return what the user sent here, due to OpenAI spec.
-					Choices: []schema.Choice{
-						{
-							FinishReason: finishReason,
-							Index:        0,
-							Delta:        &schema.Message{Content: &textContentToReturn},
-						}},
-					Object: "chat.completion.chunk",
-					Usage:  *usage,
-				}
-				respData, _ := json.Marshal(resp)
+			resp := &schema.OpenAIResponse{
+				ID:      id,
+				Created: created,
+				Model:   input.Model, // we have to return what the user sent here, due to OpenAI spec.
+				Choices: []schema.Choice{
+					{
+						FinishReason: &finishReason,
+						Index:        0,
+						Delta:        &schema.Message{},
+					}},
+				Object: "chat.completion.chunk",
+				Usage:  *usage,
+			}
+			respData, _ := json.Marshal(resp)
 
-				w.WriteString(fmt.Sprintf("data: %s\n\n", respData))
-				w.WriteString("data: [DONE]\n\n")
-				w.Flush()
-				log.Debug().Msgf("Stream ended")
-			}))
-
+			fmt.Fprintf(c.Response().Writer, "data: %s\n\n", respData)
+			fmt.Fprintf(c.Response().Writer, "data: [DONE]\n\n")
+			c.Response().Flush()
+			log.Debug().Msgf("Stream ended")
 			return nil
 
 		// no streaming mode
@@ -439,7 +454,8 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			tokenCallback := func(s string, c *[]schema.Choice) {
 				if !shouldUseFn {
 					// no function is called, just reply and use stop as finish reason
-					*c = append(*c, schema.Choice{FinishReason: "stop", Index: 0, Message: &schema.Message{Role: "assistant", Content: &s}})
+					stopReason := FinishReasonStop
+					*c = append(*c, schema.Choice{FinishReason: &stopReason, Index: 0, Message: &schema.Message{Role: "assistant", Content: &s}})
 					return
 				}
 
@@ -457,12 +473,14 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 						return
 					}
 
+					stopReason := FinishReasonStop
 					*c = append(*c, schema.Choice{
-						FinishReason: "stop",
+						FinishReason: &stopReason,
 						Message:      &schema.Message{Role: "assistant", Content: &result}})
 				default:
+					toolCallsReason := FinishReasonToolCalls
 					toolChoice := schema.Choice{
-						FinishReason: "tool_calls",
+						FinishReason: &toolCallsReason,
 						Message: &schema.Message{
 							Role: "assistant",
 						},
@@ -486,8 +504,9 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 							)
 						} else {
 							// otherwise we return more choices directly (deprecated)
+							functionCallReason := FinishReasonFunctionCall
 							*c = append(*c, schema.Choice{
-								FinishReason: "function_call",
+								FinishReason: &functionCallReason,
 								Message: &schema.Message{
 									Role:    "assistant",
 									Content: &textContentToReturn,
@@ -507,6 +526,9 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				}
 
 			}
+
+			// Echo properly supports context cancellation via c.Request().Context()
+			// No workaround needed!
 
 			result, tokenUsage, err := ComputeChoices(
 				input,
@@ -543,7 +565,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			log.Debug().Msgf("Response: %s", respData)
 
 			// Return the prediction in the response body
-			return c.JSON(resp)
+			return c.JSON(200, resp)
 		}
 	}
 }
@@ -597,7 +619,48 @@ func handleQuestion(config *config.ModelConfig, cl *config.ModelConfigLoader, in
 		audios = append(audios, m.StringAudios...)
 	}
 
-	predFunc, err := backend.ModelInference(input.Context, prompt, input.Messages, images, videos, audios, ml, config, cl, o, nil)
+	// Serialize tools and tool_choice to JSON strings
+	toolsJSON := ""
+	if len(input.Tools) > 0 {
+		toolsBytes, err := json.Marshal(input.Tools)
+		if err == nil {
+			toolsJSON = string(toolsBytes)
+		}
+	}
+	toolChoiceJSON := ""
+	if input.ToolsChoice != nil {
+		toolChoiceBytes, err := json.Marshal(input.ToolsChoice)
+		if err == nil {
+			toolChoiceJSON = string(toolChoiceBytes)
+		}
+	}
+
+	// Extract logprobs from request
+	// According to OpenAI API: logprobs is boolean, top_logprobs (0-20) controls how many top tokens per position
+	var logprobs *int
+	var topLogprobs *int
+	if input.Logprobs.IsEnabled() {
+		// If logprobs is enabled, use top_logprobs if provided, otherwise default to 1
+		if input.TopLogprobs != nil {
+			topLogprobs = input.TopLogprobs
+			// For backend compatibility, set logprobs to the top_logprobs value
+			logprobs = input.TopLogprobs
+		} else {
+			// Default to 1 if logprobs is true but top_logprobs not specified
+			val := 1
+			logprobs = &val
+			topLogprobs = &val
+		}
+	}
+
+	// Extract logit_bias from request
+	// According to OpenAI API: logit_bias is a map of token IDs (as strings) to bias values (-100 to 100)
+	var logitBias map[string]float64
+	if len(input.LogitBias) > 0 {
+		logitBias = input.LogitBias
+	}
+
+	predFunc, err := backend.ModelInference(input.Context, prompt, input.Messages, images, videos, audios, ml, config, cl, o, nil, toolsJSON, toolChoiceJSON, logprobs, topLogprobs, logitBias)
 	if err != nil {
 		log.Error().Err(err).Msg("model inference failed")
 		return "", err

@@ -50,7 +50,7 @@ jobs:
         go-version: ['${{ inputs.go-version }}']
     steps:
       - name: Clone
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: true
 
@@ -74,7 +74,7 @@ jobs:
           BACKEND=${{ inputs.backend }} BUILD_TYPE=${{ inputs.build-type }} USE_PIP=${{ inputs.use-pip }} make build-darwin-${{ inputs.lang }}-backend
 
       - name: Upload ${{ inputs.backend }}.tar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ inputs.backend }}-tar
           path: backend-images/${{ inputs.backend }}.tar
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download ${{ inputs.backend }}.tar
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: ${{ inputs.backend }}-tar
           path: .

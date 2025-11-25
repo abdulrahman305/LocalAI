@@ -1,10 +1,10 @@
-name: Bump dependencies
+name: Bump Backend dependencies
 on:
   schedule:
     - cron: 0 20 * * *
   workflow_dispatch:
 jobs:
-  bump:
+  bump-backends:
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +31,7 @@ jobs:
             file: "backend/go/piper/Makefile"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Bump dependencies 🔧
         id: bump
         run: |

@@ -634,6 +634,30 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/mcp/chat/completions": {
+            "post": {
+                "summary": "Stream MCP chat completions with reasoning, tool calls, and results",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.OpenAIRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.OpenAIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/models": {
             "get": {
                 "summary": "List and describe the various models available in the API.",
@@ -1206,6 +1230,9 @@ const docTemplate = `{
                 "index": {
                     "type": "integer"
                 },
+                "logprobs": {
+                    "$ref": "#/definitions/schema.Logprobs"
+                },
                 "message": {
                     "$ref": "#/definitions/schema.Message"
                 },
@@ -1395,6 +1422,52 @@ const docTemplate = `{
                 }
             }
         },
+        "schema.LogprobContent": {
+            "type": "object",
+            "properties": {
+                "bytes": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "logprob": {
+                    "type": "number"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "top_logprobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/schema.LogprobContent"
+                    }
+                }
+            }
+        },
+        "schema.Logprobs": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/schema.LogprobContent"
+                    }
+                }
+            }
+        },
+        "schema.LogprobsValue": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "true if logprobs should be returned",
+                    "type": "boolean"
+                }
+            }
+        },
         "schema.Message": {
             "type": "object",
             "properties": {
@@ -1549,6 +1622,22 @@ const docTemplate = `{
                     "description": "Also part of the OpenAI official spec",
                     "type": "string"
                 },
+                "logit_bias": {
+                    "description": "Map of token IDs to bias values (-100 to 100)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "logprobs": {
+                    "description": "OpenAI API logprobs parameters\nlogprobs: boolean - if true, returns log probabilities of each output token\ntop_logprobs: integer 0-20 - number of most likely tokens to return at each token position",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/schema.LogprobsValue"
+                        }
+                    ]
+                },
                 "max_tokens": {
                     "type": "integer"
                 },
@@ -1654,6 +1743,10 @@ const docTemplate = `{
                     }
                 },
                 "top_k": {
+                    "type": "integer"
+                },
+                "top_logprobs": {
+                    "description": "Number of top logprobs per token (0-20)",
                     "type": "integer"
                 },
                 "top_p": {
@@ -1862,6 +1955,9 @@ const docTemplate = `{
                 "height": {
                     "type": "integer"
                 },
+                "input_reference": {
+                    "type": "string"
+                },
                 "model": {
                     "type": "string"
                 },
@@ -1877,8 +1973,14 @@ const docTemplate = `{
                 "response_format": {
                     "type": "string"
                 },
+                "seconds": {
+                    "type": "string"
+                },
                 "seed": {
                     "type": "integer"
+                },
+                "size": {
+                    "type": "string"
                 },
                 "start_image": {
                     "type": "string"
@@ -1894,6 +1996,14 @@ const docTemplate = `{
         "services.GalleryOpStatus": {
             "type": "object",
             "properties": {
+                "cancellable": {
+                    "description": "Cancellable is true if the operation can be cancelled",
+                    "type": "boolean"
+                },
+                "cancelled": {
+                    "description": "Cancelled is true if the operation was cancelled",
+                    "type": "boolean"
+                },
                 "deletion": {
                     "description": "Deletion is true if the operation is a deletion",
                     "type": "boolean"

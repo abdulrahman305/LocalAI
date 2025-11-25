@@ -1,30 +1,35 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+	"github.com/mudler/LocalAI/core/application"
 	"github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/core/gallery"
+	"github.com/mudler/LocalAI/core/http/endpoints/localai"
 	"github.com/mudler/LocalAI/core/p2p"
 	"github.com/mudler/LocalAI/core/services"
+	"github.com/mudler/LocalAI/pkg/model"
 	"github.com/rs/zerolog/log"
 )
 
 // RegisterUIAPIRoutes registers JSON API routes for the web UI
-func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig *config.ApplicationConfig, galleryService *services.GalleryService, opcache *services.OpCache) {
+func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model.ModelLoader, appConfig *config.ApplicationConfig, galleryService *services.GalleryService, opcache *services.OpCache, applicationInstance *application.Application) {
 
 	// Operations API - Get all current operations (models + backends)
-	app.Get("/api/operations", func(c *fiber.Ctx) error {
+	app.GET("/api/operations", func(c echo.Context) error {
 		processingData, taskTypes := opcache.GetStatus()
 
-		operations := []fiber.Map{}
+		operations := []map[string]interface{}{}
 		for galleryID, jobID := range processingData {
 			taskType := "installation"
 			if tt, ok := taskTypes[galleryID]; ok {
@@ -35,23 +40,35 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			progress := 0
 			isDeletion := false
 			isQueued := false
+			isCancelled := false
+			isCancellable := false
 			message := ""
 
 			if status != nil {
-				// Skip completed operations
-				if status.Processed {
+				// Skip completed operations (unless cancelled and not yet cleaned up)
+				if status.Processed && !status.Cancelled {
+					continue
+				}
+				// Skip cancelled operations that are processed (they're done, no need to show)
+				if status.Processed && status.Cancelled {
 					continue
 				}
 
 				progress = int(status.Progress)
 				isDeletion = status.Deletion
+				isCancelled = status.Cancelled
+				isCancellable = status.Cancellable
 				message = status.Message
 				if isDeletion {
 					taskType = "deletion"
 				}
+				if isCancelled {
+					taskType = "cancelled"
+				}
 			} else {
 				// Job is queued but hasn't started
 				isQueued = true
+				isCancellable = true
 				message = "Operation queued"
 			}
 
@@ -75,17 +92,19 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 				}
 			}
 
-			operations = append(operations, fiber.Map{
-				"id":         galleryID,
-				"name":       displayName,
-				"fullName":   galleryID,
-				"jobID":      jobID,
-				"progress":   progress,
-				"taskType":   taskType,
-				"isDeletion": isDeletion,
-				"isBackend":  isBackend,
-				"isQueued":   isQueued,
-				"message":    message,
+			operations = append(operations, map[string]interface{}{
+				"id":          galleryID,
+				"name":        displayName,
+				"fullName":    galleryID,
+				"jobID":       jobID,
+				"progress":    progress,
+				"taskType":    taskType,
+				"isDeletion":  isDeletion,
+				"isBackend":   isBackend,
+				"isQueued":    isQueued,
+				"isCancelled": isCancelled,
+				"cancellable": isCancellable,
+				"message":     message,
 			})
 		}
 
@@ -103,21 +122,49 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			return operations[i]["id"].(string) < operations[j]["id"].(string)
 		})
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"operations": operations,
 		})
 	})
 
+	// Cancel operation endpoint
+	app.POST("/api/operations/:jobID/cancel", func(c echo.Context) error {
+		jobID := c.Param("jobID")
+		log.Debug().Msgf("API request to cancel operation: %s", jobID)
+
+		err := galleryService.CancelOperation(jobID)
+		if err != nil {
+			log.Error().Err(err).Msgf("Failed to cancel operation: %s", jobID)
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
+
+		// Clean up opcache for cancelled operation
+		opcache.DeleteUUID(jobID)
+
+		return c.JSON(200, map[string]interface{}{
+			"success": true,
+			"message": "Operation cancelled",
+		})
+	})
+
 	// Model Gallery APIs
-	app.Get("/api/models", func(c *fiber.Ctx) error {
-		term := c.Query("term")
-		page := c.Query("page", "1")
-		items := c.Query("items", "21")
+	app.GET("/api/models", func(c echo.Context) error {
+		term := c.QueryParam("term")
+		page := c.QueryParam("page")
+		if page == "" {
+			page = "1"
+		}
+		items := c.QueryParam("items")
+		if items == "" {
+			items = "21"
+		}
 
 		models, err := gallery.AvailableGalleryModels(appConfig.Galleries, appConfig.SystemState)
 		if err != nil {
 			log.Error().Err(err).Msg("could not list models from galleries")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -160,7 +207,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		}
 
 		// Convert models to JSON-friendly format and deduplicate by ID
-		modelsJSON := make([]fiber.Map, 0, len(models))
+		modelsJSON := make([]map[string]interface{}, 0, len(models))
 		seenIDs := make(map[string]bool)
 
 		for _, m := range models {
@@ -186,7 +233,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 			_, trustRemoteCodeExists := m.Overrides["trust_remote_code"]
 
-			modelsJSON = append(modelsJSON, fiber.Map{
+			modelsJSON = append(modelsJSON, map[string]interface{}{
 				"id":              modelID,
 				"name":            m.Name,
 				"description":     m.Description,
@@ -200,6 +247,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 				"jobID":           jobID,
 				"isDeletion":      isDeletionOp,
 				"trustRemoteCode": trustRemoteCodeExists,
+				"additionalFiles": m.AdditionalFiles,
 			})
 		}
 
@@ -212,13 +260,19 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			nextPage = totalPages
 		}
 
-		return c.JSON(fiber.Map{
+		// Calculate installed models count (models with configs + models without configs)
+		modelConfigs := cl.GetAllModelsConfigs()
+		modelsWithoutConfig, _ := services.ListModels(cl, ml, config.NoFilterFn, services.LOOSE_ONLY)
+		installedModelsCount := len(modelConfigs) + len(modelsWithoutConfig)
+
+		return c.JSON(200, map[string]interface{}{
 			"models":           modelsJSON,
 			"repositories":     appConfig.Galleries,
 			"allTags":          tags,
 			"processingModels": processingModelsData,
 			"taskTypes":        taskTypes,
 			"availableModels":  totalModels,
+			"installedModels":  installedModelsCount,
 			"currentPage":      pageNum,
 			"totalPages":       totalPages,
 			"prevPage":         prevPage,
@@ -226,12 +280,12 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		})
 	})
 
-	app.Post("/api/models/install/:id", func(c *fiber.Ctx) error {
-		galleryID := strings.Clone(c.Params("id"))
+	app.POST("/api/models/install/:id", func(c echo.Context) error {
+		galleryID := c.Param("id")
 		// URL decode the gallery ID (e.g., "localai%40model" -> "localai@model")
 		galleryID, err := url.QueryUnescape(galleryID)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid model ID",
 			})
 		}
@@ -239,7 +293,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		id, err := uuid.NewUUID()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -247,28 +301,33 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		uid := id.String()
 		opcache.Set(galleryID, uid)
 
-		op := services.GalleryOp[gallery.GalleryModel]{
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		op := services.GalleryOp[gallery.GalleryModel, gallery.ModelConfig]{
 			ID:                 uid,
 			GalleryElementName: galleryID,
 			Galleries:          appConfig.Galleries,
 			BackendGalleries:   appConfig.BackendGalleries,
+			Context:            ctx,
+			CancelFunc:         cancelFunc,
 		}
+		// Store cancellation function immediately so queued operations can be cancelled
+		galleryService.StoreCancellation(uid, cancelFunc)
 		go func() {
 			galleryService.ModelGalleryChannel <- op
 		}()
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"jobID":   uid,
 			"message": "Installation started",
 		})
 	})
 
-	app.Post("/api/models/delete/:id", func(c *fiber.Ctx) error {
-		galleryID := strings.Clone(c.Params("id"))
+	app.POST("/api/models/delete/:id", func(c echo.Context) error {
+		galleryID := c.Param("id")
 		// URL decode the gallery ID
 		galleryID, err := url.QueryUnescape(galleryID)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid model ID",
 			})
 		}
@@ -281,7 +340,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		id, err := uuid.NewUUID()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -290,30 +349,35 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		opcache.Set(galleryID, uid)
 
-		op := services.GalleryOp[gallery.GalleryModel]{
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		op := services.GalleryOp[gallery.GalleryModel, gallery.ModelConfig]{
 			ID:                 uid,
 			Delete:             true,
 			GalleryElementName: galleryName,
 			Galleries:          appConfig.Galleries,
 			BackendGalleries:   appConfig.BackendGalleries,
+			Context:            ctx,
+			CancelFunc:         cancelFunc,
 		}
+		// Store cancellation function immediately so queued operations can be cancelled
+		galleryService.StoreCancellation(uid, cancelFunc)
 		go func() {
 			galleryService.ModelGalleryChannel <- op
 			cl.RemoveModelConfig(galleryName)
 		}()
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"jobID":   uid,
 			"message": "Deletion started",
 		})
 	})
 
-	app.Post("/api/models/config/:id", func(c *fiber.Ctx) error {
-		galleryID := strings.Clone(c.Params("id"))
+	app.POST("/api/models/config/:id", func(c echo.Context) error {
+		galleryID := c.Param("id")
 		// URL decode the gallery ID
 		galleryID, err := url.QueryUnescape(galleryID)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid model ID",
 			})
 		}
@@ -321,44 +385,44 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		models, err := gallery.AvailableGalleryModels(appConfig.Galleries, appConfig.SystemState)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 
 		model := gallery.FindGalleryElement(models, galleryID)
 		if model == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			return c.JSON(http.StatusNotFound, map[string]interface{}{
 				"error": "model not found",
 			})
 		}
 
 		config, err := gallery.GetGalleryConfigFromURL[gallery.ModelConfig](model.URL, appConfig.SystemState.Model.ModelsPath)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 
-		_, err = gallery.InstallModel(appConfig.SystemState, model.Name, &config, model.Overrides, nil, false)
+		_, err = gallery.InstallModel(context.Background(), appConfig.SystemState, model.Name, &config, model.Overrides, nil, false)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"message": "Configuration file saved",
 		})
 	})
 
-	app.Get("/api/models/job/:uid", func(c *fiber.Ctx) error {
-		jobUID := strings.Clone(c.Params("uid"))
+	app.GET("/api/models/job/:uid", func(c echo.Context) error {
+		jobUID := c.Param("uid")
 
 		status := galleryService.GetStatus(jobUID)
 		if status == nil {
 			// Job is queued but hasn't started processing yet
-			return c.JSON(fiber.Map{
+			return c.JSON(200, map[string]interface{}{
 				"progress":           0,
 				"message":            "Operation queued",
 				"galleryElementName": "",
@@ -368,7 +432,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			})
 		}
 
-		response := fiber.Map{
+		response := map[string]interface{}{
 			"progress":           status.Progress,
 			"message":            status.Message,
 			"galleryElementName": status.GalleryElementName,
@@ -386,19 +450,25 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			response["completed"] = true
 		}
 
-		return c.JSON(response)
+		return c.JSON(200, response)
 	})
 
 	// Backend Gallery APIs
-	app.Get("/api/backends", func(c *fiber.Ctx) error {
-		term := c.Query("term")
-		page := c.Query("page", "1")
-		items := c.Query("items", "21")
+	app.GET("/api/backends", func(c echo.Context) error {
+		term := c.QueryParam("term")
+		page := c.QueryParam("page")
+		if page == "" {
+			page = "1"
+		}
+		items := c.QueryParam("items")
+		if items == "" {
+			items = "21"
+		}
 
 		backends, err := gallery.AvailableBackends(appConfig.BackendGalleries, appConfig.SystemState)
 		if err != nil {
 			log.Error().Err(err).Msg("could not list backends from galleries")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -441,7 +511,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		}
 
 		// Convert backends to JSON-friendly format and deduplicate by ID
-		backendsJSON := make([]fiber.Map, 0, len(backends))
+		backendsJSON := make([]map[string]interface{}, 0, len(backends))
 		seenBackendIDs := make(map[string]bool)
 
 		for _, b := range backends {
@@ -465,7 +535,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 				}
 			}
 
-			backendsJSON = append(backendsJSON, fiber.Map{
+			backendsJSON = append(backendsJSON, map[string]interface{}{
 				"id":          backendID,
 				"name":        b.Name,
 				"description": b.Description,
@@ -490,13 +560,21 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			nextPage = totalPages
 		}
 
-		return c.JSON(fiber.Map{
+		// Calculate installed backends count
+		installedBackends, err := gallery.ListSystemBackends(appConfig.SystemState)
+		installedBackendsCount := 0
+		if err == nil {
+			installedBackendsCount = len(installedBackends)
+		}
+
+		return c.JSON(200, map[string]interface{}{
 			"backends":           backendsJSON,
 			"repositories":       appConfig.BackendGalleries,
 			"allTags":            tags,
 			"processingBackends": processingBackendsData,
 			"taskTypes":          taskTypes,
 			"availableBackends":  totalBackends,
+			"installedBackends":  installedBackendsCount,
 			"currentPage":        pageNum,
 			"totalPages":         totalPages,
 			"prevPage":           prevPage,
@@ -504,12 +582,12 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		})
 	})
 
-	app.Post("/api/backends/install/:id", func(c *fiber.Ctx) error {
-		backendID := strings.Clone(c.Params("id"))
+	app.POST("/api/backends/install/:id", func(c echo.Context) error {
+		backendID := c.Param("id")
 		// URL decode the backend ID
 		backendID, err := url.QueryUnescape(backendID)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid backend ID",
 			})
 		}
@@ -517,7 +595,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		id, err := uuid.NewUUID()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -525,27 +603,32 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		uid := id.String()
 		opcache.Set(backendID, uid)
 
-		op := services.GalleryOp[gallery.GalleryBackend]{
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		op := services.GalleryOp[gallery.GalleryBackend, any]{
 			ID:                 uid,
 			GalleryElementName: backendID,
 			Galleries:          appConfig.BackendGalleries,
+			Context:            ctx,
+			CancelFunc:         cancelFunc,
 		}
+		// Store cancellation function immediately so queued operations can be cancelled
+		galleryService.StoreCancellation(uid, cancelFunc)
 		go func() {
 			galleryService.BackendGalleryChannel <- op
 		}()
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"jobID":   uid,
 			"message": "Backend installation started",
 		})
 	})
 
-	app.Post("/api/backends/delete/:id", func(c *fiber.Ctx) error {
-		backendID := strings.Clone(c.Params("id"))
+	app.POST("/api/backends/delete/:id", func(c echo.Context) error {
+		backendID := c.Param("id")
 		// URL decode the backend ID
 		backendID, err := url.QueryUnescape(backendID)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid backend ID",
 			})
 		}
@@ -558,7 +641,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		id, err := uuid.NewUUID()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
@@ -567,29 +650,34 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 
 		opcache.Set(backendID, uid)
 
-		op := services.GalleryOp[gallery.GalleryBackend]{
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		op := services.GalleryOp[gallery.GalleryBackend, any]{
 			ID:                 uid,
 			Delete:             true,
 			GalleryElementName: backendName,
 			Galleries:          appConfig.BackendGalleries,
+			Context:            ctx,
+			CancelFunc:         cancelFunc,
 		}
+		// Store cancellation function immediately so queued operations can be cancelled
+		galleryService.StoreCancellation(uid, cancelFunc)
 		go func() {
 			galleryService.BackendGalleryChannel <- op
 		}()
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"jobID":   uid,
 			"message": "Backend deletion started",
 		})
 	})
 
-	app.Get("/api/backends/job/:uid", func(c *fiber.Ctx) error {
-		jobUID := strings.Clone(c.Params("uid"))
+	app.GET("/api/backends/job/:uid", func(c echo.Context) error {
+		jobUID := c.Param("uid")
 
 		status := galleryService.GetStatus(jobUID)
 		if status == nil {
 			// Job is queued but hasn't started processing yet
-			return c.JSON(fiber.Map{
+			return c.JSON(200, map[string]interface{}{
 				"progress":           0,
 				"message":            "Operation queued",
 				"galleryElementName": "",
@@ -599,7 +687,7 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			})
 		}
 
-		response := fiber.Map{
+		response := map[string]interface{}{
 			"progress":           status.Progress,
 			"message":            status.Message,
 			"galleryElementName": status.GalleryElementName,
@@ -617,16 +705,16 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			response["completed"] = true
 		}
 
-		return c.JSON(response)
+		return c.JSON(200, response)
 	})
 
 	// System Backend Deletion API (for installed backends on index page)
-	app.Post("/api/backends/system/delete/:name", func(c *fiber.Ctx) error {
-		backendName := strings.Clone(c.Params("name"))
+	app.POST("/api/backends/system/delete/:name", func(c echo.Context) error {
+		backendName := c.Param("name")
 		// URL decode the backend name
 		backendName, err := url.QueryUnescape(backendName)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "invalid backend name",
 			})
 		}
@@ -635,24 +723,24 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 		// Use the gallery package to delete the backend
 		if err := gallery.DeleteBackendFromSystem(appConfig.SystemState, backendName); err != nil {
 			log.Error().Err(err).Msgf("Failed to delete backend: %s", backendName)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"success": true,
 			"message": "Backend deleted successfully",
 		})
 	})
 
 	// P2P APIs
-	app.Get("/api/p2p/workers", func(c *fiber.Ctx) error {
+	app.GET("/api/p2p/workers", func(c echo.Context) error {
 		nodes := p2p.GetAvailableNodes(p2p.NetworkID(appConfig.P2PNetworkID, p2p.WorkerID))
 
-		nodesJSON := make([]fiber.Map, 0, len(nodes))
+		nodesJSON := make([]map[string]interface{}, 0, len(nodes))
 		for _, n := range nodes {
-			nodesJSON = append(nodesJSON, fiber.Map{
+			nodesJSON = append(nodesJSON, map[string]interface{}{
 				"name":          n.Name,
 				"id":            n.ID,
 				"tunnelAddress": n.TunnelAddress,
@@ -662,17 +750,17 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			})
 		}
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"nodes": nodesJSON,
 		})
 	})
 
-	app.Get("/api/p2p/federation", func(c *fiber.Ctx) error {
+	app.GET("/api/p2p/federation", func(c echo.Context) error {
 		nodes := p2p.GetAvailableNodes(p2p.NetworkID(appConfig.P2PNetworkID, p2p.FederatedID))
 
-		nodesJSON := make([]fiber.Map, 0, len(nodes))
+		nodesJSON := make([]map[string]interface{}, 0, len(nodes))
 		for _, n := range nodes {
-			nodesJSON = append(nodesJSON, fiber.Map{
+			nodesJSON = append(nodesJSON, map[string]interface{}{
 				"name":          n.Name,
 				"id":            n.ID,
 				"tunnelAddress": n.TunnelAddress,
@@ -682,12 +770,12 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			})
 		}
 
-		return c.JSON(fiber.Map{
+		return c.JSON(200, map[string]interface{}{
 			"nodes": nodesJSON,
 		})
 	})
 
-	app.Get("/api/p2p/stats", func(c *fiber.Ctx) error {
+	app.GET("/api/p2p/stats", func(c echo.Context) error {
 		workerNodes := p2p.GetAvailableNodes(p2p.NetworkID(appConfig.P2PNetworkID, p2p.WorkerID))
 		federatedNodes := p2p.GetAvailableNodes(p2p.NetworkID(appConfig.P2PNetworkID, p2p.FederatedID))
 
@@ -705,15 +793,21 @@ func RegisterUIAPIRoutes(app *fiber.App, cl *config.ModelConfigLoader, appConfig
 			}
 		}
 
-		return c.JSON(fiber.Map{
-			"workers": fiber.Map{
+		return c.JSON(200, map[string]interface{}{
+			"workers": map[string]interface{}{
 				"online": workersOnline,
 				"total":  len(workerNodes),
 			},
-			"federated": fiber.Map{
+			"federated": map[string]interface{}{
 				"online": federatedOnline,
 				"total":  len(federatedNodes),
 			},
 		})
 	})
+
+	if !appConfig.DisableRuntimeSettings {
+		// Settings API
+		app.GET("/api/settings", localai.GetSettingsEndpoint(applicationInstance))
+		app.POST("/api/settings", localai.UpdateSettingsEndpoint(applicationInstance))
+	}
 }

@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/mudler/LocalAI/pkg/oci"
 	"github.com/mudler/LocalAI/pkg/utils"
+	"github.com/mudler/LocalAI/pkg/xio"
 	"github.com/rs/zerolog/log"
 )
 
@@ -48,17 +50,16 @@ func loadConfig() string {
 	return HF_ENDPOINT
 }
 
-func (uri URI) DownloadWithCallback(basePath string, f func(url string, i []byte) error) error {
-	return uri.DownloadWithAuthorizationAndCallback(basePath, "", f)
+func (uri URI) ReadWithCallback(basePath string, f func(url string, i []byte) error) error {
+	return uri.ReadWithAuthorizationAndCallback(context.Background(), basePath, "", f)
 }
 
-func (uri URI) DownloadWithAuthorizationAndCallback(basePath string, authorization string, f func(url string, i []byte) error) error {
+func (uri URI) ReadWithAuthorizationAndCallback(ctx context.Context, basePath string, authorization string, f func(url string, i []byte) error) error {
 	url := uri.ResolveURL()
 
-	if strings.HasPrefix(url, LocalPrefix) {
-		rawURL := strings.TrimPrefix(url, LocalPrefix)
+	if strings.HasPrefix(string(uri), LocalPrefix) {
 		// checks if the file is symbolic, and resolve if so - otherwise, this function returns the path unmodified.
-		resolvedFile, err := filepath.EvalSymlinks(rawURL)
+		resolvedFile, err := filepath.EvalSymlinks(url)
 		if err != nil {
 			return err
 		}
@@ -83,8 +84,7 @@ func (uri URI) DownloadWithAuthorizationAndCallback(basePath string, authorizati
 	}
 
 	// Send a GET request to the URL
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -175,6 +175,8 @@ func (s URI) LooksLikeOCIFile() bool {
 
 func (s URI) ResolveURL() string {
 	switch {
+	case strings.HasPrefix(string(s), LocalPrefix):
+		return strings.TrimPrefix(string(s), LocalPrefix)
 	case strings.HasPrefix(string(s), GithubURI2):
 		repository := strings.Replace(string(s), GithubURI2, "", 1)
 
@@ -264,6 +266,10 @@ func (uri URI) checkSeverSupportsRangeHeader() (bool, error) {
 }
 
 func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStatus func(string, string, string, float64)) error {
+	return uri.DownloadFileWithContext(context.Background(), filePath, sha, fileN, total, downloadStatus)
+}
+
+func (uri URI) DownloadFileWithContext(ctx context.Context, filePath, sha string, fileN, total int, downloadStatus func(string, string, string, float64)) error {
 	url := uri.ResolveURL()
 	if uri.LooksLikeOCI() {
 
@@ -285,7 +291,7 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 		}
 
 		if url, ok := strings.CutPrefix(url, OllamaPrefix); ok {
-			return oci.OllamaFetchModel(url, filePath, progressStatus)
+			return oci.OllamaFetchModel(ctx, url, filePath, progressStatus)
 		}
 
 		if url, ok := strings.CutPrefix(url, OCIFilePrefix); ok {
@@ -295,7 +301,7 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 				return fmt.Errorf("failed to open tarball: %s", err.Error())
 			}
 
-			return oci.ExtractOCIImage(img, url, filePath, downloadStatus)
+			return oci.ExtractOCIImage(ctx, img, url, filePath, downloadStatus)
 		}
 
 		url = strings.TrimPrefix(url, OCIPrefix)
@@ -304,17 +310,20 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 			return fmt.Errorf("failed to get image %q: %v", url, err)
 		}
 
-		return oci.ExtractOCIImage(img, url, filePath, downloadStatus)
+		return oci.ExtractOCIImage(ctx, img, url, filePath, downloadStatus)
 	}
 
-	// We need to check if url looks like an URL or bail out
-	if !URI(url).LooksLikeHTTPURL() {
-		return fmt.Errorf("url %q does not look like an HTTP URL", url)
+	// Check for cancellation before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Check if the file already exists
 	_, err := os.Stat(filePath)
 	if err == nil {
+		log.Debug().Str("filePath", filePath).Msg("[downloader] File already exists")
 		// File exists, check SHA
 		if sha != "" {
 			// Verify SHA
@@ -339,14 +348,14 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 			log.Debug().Msgf("File %q already exists. Skipping download", filePath)
 			return nil
 		}
-	} else if !os.IsNotExist(err) {
+	} else if !os.IsNotExist(err) || !URI(url).LooksLikeHTTPURL() {
 		// Error occurred while checking file existence
-		return fmt.Errorf("failed to check file %q existence: %v", filePath, err)
+		return fmt.Errorf("file %s does not exist (%v) and %s does not look like an HTTP URL", filePath, err, url)
 	}
 
-	log.Info().Msgf("Downloading %q", url)
+	log.Info().Msgf("Downloading %s", url)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request for %q: %v", filePath, err)
 	}
@@ -354,7 +363,7 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 	// save partial download to dedicated file
 	tmpFilePath := filePath + ".partial"
 	tmpFileInfo, err := os.Stat(tmpFilePath)
-	if err == nil {
+	if err == nil && uri.LooksLikeHTTPURL() {
 		support, err := uri.checkSeverSupportsRangeHeader()
 		if err != nil {
 			return fmt.Errorf("failed to check if uri server supports range header: %v", err)
@@ -372,16 +381,40 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 		return fmt.Errorf("failed to check file %q existence: %v", filePath, err)
 	}
 
-	// Start the request
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to download file %q: %v", filePath, err)
-	}
-	defer resp.Body.Close()
+	var source io.ReadCloser
+	var contentLength int64
+	if _, e := os.Stat(uri.ResolveURL()); strings.HasPrefix(string(uri), LocalPrefix) || e == nil {
+		file, err := os.Open(uri.ResolveURL())
+		if err != nil {
+			return fmt.Errorf("failed to open file %q: %v", uri.ResolveURL(), err)
+		}
+		l, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("failed to get file size %q: %v", uri.ResolveURL(), err)
+		}
+		source = file
+		contentLength = l.Size()
+	} else {
+		// Start the request
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			// Check if error is due to context cancellation
+			if errors.Is(err, context.Canceled) {
+				// Clean up partial file on cancellation
+				removePartialFile(tmpFilePath)
+				return err
+			}
+			return fmt.Errorf("failed to download file %q: %v", filePath, err)
+		}
+		//defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("failed to download url %q, invalid status code %d", url, resp.StatusCode)
+		if resp.StatusCode >= 400 {
+			return fmt.Errorf("failed to download url %q, invalid status code %d", url, resp.StatusCode)
+		}
+		source = resp.Body
+		contentLength = resp.ContentLength
 	}
+	defer source.Close()
 
 	// Create parent directory
 	err = os.MkdirAll(filepath.Dir(filePath), 0750)
@@ -401,15 +434,31 @@ func (uri URI) DownloadFile(filePath, sha string, fileN, total int, downloadStat
 	}
 	progress := &progressWriter{
 		fileName:       tmpFilePath,
-		total:          resp.ContentLength,
+		total:          contentLength,
 		hash:           hash,
 		fileNo:         fileN,
 		totalFiles:     total,
 		downloadStatus: downloadStatus,
+		ctx:            ctx,
 	}
-	_, err = io.Copy(io.MultiWriter(outFile, progress), resp.Body)
+
+	_, err = xio.Copy(ctx, io.MultiWriter(outFile, progress), source)
 	if err != nil {
+		// Check if error is due to context cancellation
+		if errors.Is(err, context.Canceled) {
+			// Clean up partial file on cancellation
+			removePartialFile(tmpFilePath)
+			return err
+		}
 		return fmt.Errorf("failed to write file %q: %v", filePath, err)
+	}
+
+	// Check for cancellation before finalizing
+	select {
+	case <-ctx.Done():
+		removePartialFile(tmpFilePath)
+		return ctx.Err()
+	default:
 	}
 
 	err = os.Rename(tmpFilePath, filePath)

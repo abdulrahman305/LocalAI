@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"github.com/mudler/LocalAI/core/schema"
 	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/mudler/LocalAI/pkg/functions"
+	"github.com/mudler/cogito"
 	"gopkg.in/yaml.v3"
 )
 
@@ -16,30 +18,31 @@ const (
 	RAND_SEED = -1
 )
 
+// @Description TTS configuration
 type TTSConfig struct {
 
 	// Voice wav path or id
-	Voice string `yaml:"voice" json:"voice"`
+	Voice string `yaml:"voice,omitempty" json:"voice,omitempty"`
 
-	AudioPath string `yaml:"audio_path" json:"audio_path"`
+	AudioPath string `yaml:"audio_path,omitempty" json:"audio_path,omitempty"`
 }
 
-// ModelConfig represents a model configuration
+// @Description ModelConfig represents a model configuration
 type ModelConfig struct {
 	modelConfigFile          string `yaml:"-" json:"-"`
-	schema.PredictionOptions `yaml:"parameters" json:"parameters"`
-	Name                     string `yaml:"name" json:"name"`
+	schema.PredictionOptions `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	Name                     string `yaml:"name,omitempty" json:"name,omitempty"`
 
-	F16                 *bool                `yaml:"f16" json:"f16"`
-	Threads             *int                 `yaml:"threads" json:"threads"`
-	Debug               *bool                `yaml:"debug" json:"debug"`
-	Roles               map[string]string    `yaml:"roles" json:"roles"`
-	Embeddings          *bool                `yaml:"embeddings" json:"embeddings"`
-	Backend             string               `yaml:"backend" json:"backend"`
-	TemplateConfig      TemplateConfig       `yaml:"template" json:"template"`
-	KnownUsecaseStrings []string             `yaml:"known_usecases" json:"known_usecases"`
+	F16                 *bool                `yaml:"f16,omitempty" json:"f16,omitempty"`
+	Threads             *int                 `yaml:"threads,omitempty" json:"threads,omitempty"`
+	Debug               *bool                `yaml:"debug,omitempty" json:"debug,omitempty"`
+	Roles               map[string]string    `yaml:"roles,omitempty" json:"roles,omitempty"`
+	Embeddings          *bool                `yaml:"embeddings,omitempty" json:"embeddings,omitempty"`
+	Backend             string               `yaml:"backend,omitempty" json:"backend,omitempty"`
+	TemplateConfig      TemplateConfig       `yaml:"template,omitempty" json:"template,omitempty"`
+	KnownUsecaseStrings []string             `yaml:"known_usecases,omitempty" json:"known_usecases,omitempty"`
 	KnownUsecases       *ModelConfigUsecases `yaml:"-" json:"-"`
-	Pipeline            Pipeline             `yaml:"pipeline" json:"pipeline"`
+	Pipeline            Pipeline             `yaml:"pipeline,omitempty" json:"pipeline,omitempty"`
 
 	PromptStrings, InputStrings                []string               `yaml:"-" json:"-"`
 	InputToken                                 [][]int                `yaml:"-" json:"-"`
@@ -47,97 +50,101 @@ type ModelConfig struct {
 	ResponseFormat                             string                 `yaml:"-" json:"-"`
 	ResponseFormatMap                          map[string]interface{} `yaml:"-" json:"-"`
 
-	FunctionsConfig functions.FunctionsConfig `yaml:"function" json:"function"`
+	FunctionsConfig functions.FunctionsConfig `yaml:"function,omitempty" json:"function,omitempty"`
 
-	FeatureFlag FeatureFlag `yaml:"feature_flags" json:"feature_flags"` // Feature Flag registry. We move fast, and features may break on a per model/backend basis. Registry for (usually temporary) flags that indicate aborting something early.
+	FeatureFlag FeatureFlag `yaml:"feature_flags,omitempty" json:"feature_flags,omitempty"` // Feature Flag registry. We move fast, and features may break on a per model/backend basis. Registry for (usually temporary) flags that indicate aborting something early.
 	// LLM configs (GPT4ALL, Llama.cpp, ...)
 	LLMConfig `yaml:",inline" json:",inline"`
 
 	// Diffusers
-	Diffusers Diffusers `yaml:"diffusers" json:"diffusers"`
-	Step      int       `yaml:"step" json:"step"`
+	Diffusers Diffusers `yaml:"diffusers,omitempty" json:"diffusers,omitempty"`
+	Step      int       `yaml:"step,omitempty" json:"step,omitempty"`
 
 	// GRPC Options
-	GRPC GRPC `yaml:"grpc" json:"grpc"`
+	GRPC GRPC `yaml:"grpc,omitempty" json:"grpc,omitempty"`
 
 	// TTS specifics
-	TTSConfig `yaml:"tts" json:"tts"`
+	TTSConfig `yaml:"tts,omitempty" json:"tts,omitempty"`
 
 	// CUDA
 	// Explicitly enable CUDA or not (some backends might need it)
-	CUDA bool `yaml:"cuda" json:"cuda"`
+	CUDA bool `yaml:"cuda,omitempty" json:"cuda,omitempty"`
 
-	DownloadFiles []File `yaml:"download_files" json:"download_files"`
+	DownloadFiles []File `yaml:"download_files,omitempty" json:"download_files,omitempty"`
 
-	Description string `yaml:"description" json:"description"`
-	Usage       string `yaml:"usage" json:"usage"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Usage       string `yaml:"usage,omitempty" json:"usage,omitempty"`
 
-	Options   []string `yaml:"options" json:"options"`
-	Overrides []string `yaml:"overrides" json:"overrides"`
+	Options   []string `yaml:"options,omitempty" json:"options,omitempty"`
+	Overrides []string `yaml:"overrides,omitempty" json:"overrides,omitempty"`
 
-	MCP   MCPConfig   `yaml:"mcp" json:"mcp"`
-	Agent AgentConfig `yaml:"agent" json:"agent"`
+	MCP   MCPConfig   `yaml:"mcp,omitempty" json:"mcp,omitempty"`
+	Agent AgentConfig `yaml:"agent,omitempty" json:"agent,omitempty"`
 }
 
+// @Description MCP configuration
 type MCPConfig struct {
-	Servers string `yaml:"remote" json:"remote"`
-	Stdio   string `yaml:"stdio" json:"stdio"`
+	Servers string `yaml:"remote,omitempty" json:"remote,omitempty"`
+	Stdio   string `yaml:"stdio,omitempty" json:"stdio,omitempty"`
 }
 
+// @Description Agent configuration
 type AgentConfig struct {
-	MaxAttempts           int  `yaml:"max_attempts" json:"max_attempts"`
-	MaxIterations         int  `yaml:"max_iterations" json:"max_iterations"`
-	EnableReasoning       bool `yaml:"enable_reasoning" json:"enable_reasoning"`
-	EnableReEvaluation    bool `yaml:"enable_re_evaluation" json:"enable_re_evaluation"`
-	EnablePlanning        bool `yaml:"enable_planning" json:"enable_planning"`
-	EnableMCPPrompts      bool `yaml:"enable_mcp_prompts" json:"enable_mcp_prompts"`
-	EnablePlanReEvaluator bool `yaml:"enable_plan_re_evaluator" json:"enable_plan_re_evaluator"`
+	MaxAttempts           int  `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
+	MaxIterations         int  `yaml:"max_iterations,omitempty" json:"max_iterations,omitempty"`
+	EnableReasoning       bool `yaml:"enable_reasoning,omitempty" json:"enable_reasoning,omitempty"`
+	EnablePlanning        bool `yaml:"enable_planning,omitempty" json:"enable_planning,omitempty"`
+	EnableMCPPrompts      bool `yaml:"enable_mcp_prompts,omitempty" json:"enable_mcp_prompts,omitempty"`
+	EnablePlanReEvaluator bool `yaml:"enable_plan_re_evaluator,omitempty" json:"enable_plan_re_evaluator,omitempty"`
 }
 
-func (c *MCPConfig) MCPConfigFromYAML() (MCPGenericConfig[MCPRemoteServers], MCPGenericConfig[MCPSTDIOServers]) {
+func (c *MCPConfig) MCPConfigFromYAML() (MCPGenericConfig[MCPRemoteServers], MCPGenericConfig[MCPSTDIOServers], error) {
 	var remote MCPGenericConfig[MCPRemoteServers]
 	var stdio MCPGenericConfig[MCPSTDIOServers]
 
 	if err := yaml.Unmarshal([]byte(c.Servers), &remote); err != nil {
-		return remote, stdio
+		return remote, stdio, err
 	}
 
 	if err := yaml.Unmarshal([]byte(c.Stdio), &stdio); err != nil {
-		return remote, stdio
+		return remote, stdio, err
 	}
-
-	return remote, stdio
+	return remote, stdio, nil
 }
 
+// @Description MCP generic configuration
 type MCPGenericConfig[T any] struct {
-	Servers T `yaml:"mcpServers" json:"mcpServers"`
+	Servers T `yaml:"mcpServers,omitempty" json:"mcpServers,omitempty"`
 }
 type MCPRemoteServers map[string]MCPRemoteServer
 type MCPSTDIOServers map[string]MCPSTDIOServer
 
+// @Description MCP remote server configuration
 type MCPRemoteServer struct {
-	URL   string `json:"url"`
-	Token string `json:"token"`
+	URL   string `json:"url,omitempty"`
+	Token string `json:"token,omitempty"`
 }
 
+// @Description MCP STDIO server configuration
 type MCPSTDIOServer struct {
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env"`
-	Command string            `json:"command"`
+	Args    []string          `json:"args,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+	Command string            `json:"command,omitempty"`
 }
 
-// Pipeline defines other models to use for audio-to-audio
+// @Description Pipeline defines other models to use for audio-to-audio
 type Pipeline struct {
-	TTS           string `yaml:"tts" json:"tts"`
-	LLM           string `yaml:"llm" json:"llm"`
-	Transcription string `yaml:"transcription" json:"transcription"`
-	VAD           string `yaml:"vad" json:"vad"`
+	TTS           string `yaml:"tts,omitempty" json:"tts,omitempty"`
+	LLM           string `yaml:"llm,omitempty" json:"llm,omitempty"`
+	Transcription string `yaml:"transcription,omitempty" json:"transcription,omitempty"`
+	VAD           string `yaml:"vad,omitempty" json:"vad,omitempty"`
 }
 
+// @Description File configuration for model downloads
 type File struct {
-	Filename string         `yaml:"filename" json:"filename"`
-	SHA256   string         `yaml:"sha256" json:"sha256"`
-	URI      downloader.URI `yaml:"uri" json:"uri"`
+	Filename string         `yaml:"filename,omitempty" json:"filename,omitempty"`
+	SHA256   string         `yaml:"sha256,omitempty" json:"sha256,omitempty"`
+	URI      downloader.URI `yaml:"uri,omitempty" json:"uri,omitempty"`
 }
 
 type FeatureFlag map[string]*bool
@@ -149,126 +156,136 @@ func (ff FeatureFlag) Enabled(s string) bool {
 	return false
 }
 
+// @Description GRPC configuration
 type GRPC struct {
-	Attempts          int `yaml:"attempts" json:"attempts"`
-	AttemptsSleepTime int `yaml:"attempts_sleep_time" json:"attempts_sleep_time"`
+	Attempts          int `yaml:"attempts,omitempty" json:"attempts,omitempty"`
+	AttemptsSleepTime int `yaml:"attempts_sleep_time,omitempty" json:"attempts_sleep_time,omitempty"`
 }
 
+// @Description Diffusers configuration
 type Diffusers struct {
-	CUDA             bool   `yaml:"cuda" json:"cuda"`
-	PipelineType     string `yaml:"pipeline_type" json:"pipeline_type"`
-	SchedulerType    string `yaml:"scheduler_type" json:"scheduler_type"`
-	EnableParameters string `yaml:"enable_parameters" json:"enable_parameters"` // A list of comma separated parameters to specify
-	IMG2IMG          bool   `yaml:"img2img" json:"img2img"`                     // Image to Image Diffuser
-	ClipSkip         int    `yaml:"clip_skip" json:"clip_skip"`                 // Skip every N frames
-	ClipModel        string `yaml:"clip_model" json:"clip_model"`               // Clip model to use
-	ClipSubFolder    string `yaml:"clip_subfolder" json:"clip_subfolder"`       // Subfolder to use for clip model
-	ControlNet       string `yaml:"control_net" json:"control_net"`
+	CUDA             bool   `yaml:"cuda,omitempty" json:"cuda,omitempty"`
+	PipelineType     string `yaml:"pipeline_type,omitempty" json:"pipeline_type,omitempty"`
+	SchedulerType    string `yaml:"scheduler_type,omitempty" json:"scheduler_type,omitempty"`
+	EnableParameters string `yaml:"enable_parameters,omitempty" json:"enable_parameters,omitempty"` // A list of comma separated parameters to specify
+	IMG2IMG          bool   `yaml:"img2img,omitempty" json:"img2img,omitempty"`                     // Image to Image Diffuser
+	ClipSkip         int    `yaml:"clip_skip,omitempty" json:"clip_skip,omitempty"`                 // Skip every N frames
+	ClipModel        string `yaml:"clip_model,omitempty" json:"clip_model,omitempty"`               // Clip model to use
+	ClipSubFolder    string `yaml:"clip_subfolder,omitempty" json:"clip_subfolder,omitempty"`       // Subfolder to use for clip model
+	ControlNet       string `yaml:"control_net,omitempty" json:"control_net,omitempty"`
 }
 
-// LLMConfig is a struct that holds the configuration that are
-// generic for most of the LLM backends.
+// @Description LLMConfig is a struct that holds the configuration that are generic for most of the LLM backends.
 type LLMConfig struct {
-	SystemPrompt    string   `yaml:"system_prompt" json:"system_prompt"`
-	TensorSplit     string   `yaml:"tensor_split" json:"tensor_split"`
-	MainGPU         string   `yaml:"main_gpu" json:"main_gpu"`
-	RMSNormEps      float32  `yaml:"rms_norm_eps" json:"rms_norm_eps"`
-	NGQA            int32    `yaml:"ngqa" json:"ngqa"`
-	PromptCachePath string   `yaml:"prompt_cache_path" json:"prompt_cache_path"`
-	PromptCacheAll  bool     `yaml:"prompt_cache_all" json:"prompt_cache_all"`
-	PromptCacheRO   bool     `yaml:"prompt_cache_ro" json:"prompt_cache_ro"`
-	MirostatETA     *float64 `yaml:"mirostat_eta" json:"mirostat_eta"`
-	MirostatTAU     *float64 `yaml:"mirostat_tau" json:"mirostat_tau"`
-	Mirostat        *int     `yaml:"mirostat" json:"mirostat"`
-	NGPULayers      *int     `yaml:"gpu_layers" json:"gpu_layers"`
-	MMap            *bool    `yaml:"mmap" json:"mmap"`
-	MMlock          *bool    `yaml:"mmlock" json:"mmlock"`
-	LowVRAM         *bool    `yaml:"low_vram" json:"low_vram"`
-	Reranking       *bool    `yaml:"reranking" json:"reranking"`
-	Grammar         string   `yaml:"grammar" json:"grammar"`
-	StopWords       []string `yaml:"stopwords" json:"stopwords"`
-	Cutstrings      []string `yaml:"cutstrings" json:"cutstrings"`
-	ExtractRegex    []string `yaml:"extract_regex" json:"extract_regex"`
-	TrimSpace       []string `yaml:"trimspace" json:"trimspace"`
-	TrimSuffix      []string `yaml:"trimsuffix" json:"trimsuffix"`
+	SystemPrompt    string   `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	TensorSplit     string   `yaml:"tensor_split,omitempty" json:"tensor_split,omitempty"`
+	MainGPU         string   `yaml:"main_gpu,omitempty" json:"main_gpu,omitempty"`
+	RMSNormEps      float32  `yaml:"rms_norm_eps,omitempty" json:"rms_norm_eps,omitempty"`
+	NGQA            int32    `yaml:"ngqa,omitempty" json:"ngqa,omitempty"`
+	PromptCachePath string   `yaml:"prompt_cache_path,omitempty" json:"prompt_cache_path,omitempty"`
+	PromptCacheAll  bool     `yaml:"prompt_cache_all,omitempty" json:"prompt_cache_all,omitempty"`
+	PromptCacheRO   bool     `yaml:"prompt_cache_ro,omitempty" json:"prompt_cache_ro,omitempty"`
+	MirostatETA     *float64 `yaml:"mirostat_eta,omitempty" json:"mirostat_eta,omitempty"`
+	MirostatTAU     *float64 `yaml:"mirostat_tau,omitempty" json:"mirostat_tau,omitempty"`
+	Mirostat        *int     `yaml:"mirostat,omitempty" json:"mirostat,omitempty"`
+	NGPULayers      *int     `yaml:"gpu_layers,omitempty" json:"gpu_layers,omitempty"`
+	MMap            *bool    `yaml:"mmap,omitempty" json:"mmap,omitempty"`
+	MMlock          *bool    `yaml:"mmlock,omitempty" json:"mmlock,omitempty"`
+	LowVRAM         *bool    `yaml:"low_vram,omitempty" json:"low_vram,omitempty"`
+	Reranking       *bool    `yaml:"reranking,omitempty" json:"reranking,omitempty"`
+	Grammar         string   `yaml:"grammar,omitempty" json:"grammar,omitempty"`
+	StopWords       []string `yaml:"stopwords,omitempty" json:"stopwords,omitempty"`
+	Cutstrings      []string `yaml:"cutstrings,omitempty" json:"cutstrings,omitempty"`
+	ExtractRegex    []string `yaml:"extract_regex,omitempty" json:"extract_regex,omitempty"`
+	TrimSpace       []string `yaml:"trimspace,omitempty" json:"trimspace,omitempty"`
+	TrimSuffix      []string `yaml:"trimsuffix,omitempty" json:"trimsuffix,omitempty"`
 
-	ContextSize          *int             `yaml:"context_size" json:"context_size"`
-	NUMA                 bool             `yaml:"numa" json:"numa"`
-	LoraAdapter          string           `yaml:"lora_adapter" json:"lora_adapter"`
-	LoraBase             string           `yaml:"lora_base" json:"lora_base"`
-	LoraAdapters         []string         `yaml:"lora_adapters" json:"lora_adapters"`
-	LoraScales           []float32        `yaml:"lora_scales" json:"lora_scales"`
-	LoraScale            float32          `yaml:"lora_scale" json:"lora_scale"`
-	NoMulMatQ            bool             `yaml:"no_mulmatq" json:"no_mulmatq"`
-	DraftModel           string           `yaml:"draft_model" json:"draft_model"`
-	NDraft               int32            `yaml:"n_draft" json:"n_draft"`
-	Quantization         string           `yaml:"quantization" json:"quantization"`
-	LoadFormat           string           `yaml:"load_format" json:"load_format"`
-	GPUMemoryUtilization float32          `yaml:"gpu_memory_utilization" json:"gpu_memory_utilization"` // vLLM
-	TrustRemoteCode      bool             `yaml:"trust_remote_code" json:"trust_remote_code"`           // vLLM
-	EnforceEager         bool             `yaml:"enforce_eager" json:"enforce_eager"`                   // vLLM
-	SwapSpace            int              `yaml:"swap_space" json:"swap_space"`                         // vLLM
-	MaxModelLen          int              `yaml:"max_model_len" json:"max_model_len"`                   // vLLM
-	TensorParallelSize   int              `yaml:"tensor_parallel_size" json:"tensor_parallel_size"`     // vLLM
-	DisableLogStatus     bool             `yaml:"disable_log_stats" json:"disable_log_stats"`           // vLLM
-	DType                string           `yaml:"dtype" json:"dtype"`                                   // vLLM
-	LimitMMPerPrompt     LimitMMPerPrompt `yaml:"limit_mm_per_prompt" json:"limit_mm_per_prompt"`       // vLLM
-	MMProj               string           `yaml:"mmproj" json:"mmproj"`
+	ContextSize          *int             `yaml:"context_size,omitempty" json:"context_size,omitempty"`
+	NUMA                 bool             `yaml:"numa,omitempty" json:"numa,omitempty"`
+	LoraAdapter          string           `yaml:"lora_adapter,omitempty" json:"lora_adapter,omitempty"`
+	LoraBase             string           `yaml:"lora_base,omitempty" json:"lora_base,omitempty"`
+	LoraAdapters         []string         `yaml:"lora_adapters,omitempty" json:"lora_adapters,omitempty"`
+	LoraScales           []float32        `yaml:"lora_scales,omitempty" json:"lora_scales,omitempty"`
+	LoraScale            float32          `yaml:"lora_scale,omitempty" json:"lora_scale,omitempty"`
+	NoMulMatQ            bool             `yaml:"no_mulmatq,omitempty" json:"no_mulmatq,omitempty"`
+	DraftModel           string           `yaml:"draft_model,omitempty" json:"draft_model,omitempty"`
+	NDraft               int32            `yaml:"n_draft,omitempty" json:"n_draft,omitempty"`
+	Quantization         string           `yaml:"quantization,omitempty" json:"quantization,omitempty"`
+	LoadFormat           string           `yaml:"load_format,omitempty" json:"load_format,omitempty"`
+	GPUMemoryUtilization float32          `yaml:"gpu_memory_utilization,omitempty" json:"gpu_memory_utilization,omitempty"` // vLLM
+	TrustRemoteCode      bool             `yaml:"trust_remote_code,omitempty" json:"trust_remote_code,omitempty"`           // vLLM
+	EnforceEager         bool             `yaml:"enforce_eager,omitempty" json:"enforce_eager,omitempty"`                   // vLLM
+	SwapSpace            int              `yaml:"swap_space,omitempty" json:"swap_space,omitempty"`                         // vLLM
+	MaxModelLen          int              `yaml:"max_model_len,omitempty" json:"max_model_len,omitempty"`                   // vLLM
+	TensorParallelSize   int              `yaml:"tensor_parallel_size,omitempty" json:"tensor_parallel_size,omitempty"`     // vLLM
+	DisableLogStatus     bool             `yaml:"disable_log_stats,omitempty" json:"disable_log_stats,omitempty"`           // vLLM
+	DType                string           `yaml:"dtype,omitempty" json:"dtype,omitempty"`                                   // vLLM
+	LimitMMPerPrompt     LimitMMPerPrompt `yaml:"limit_mm_per_prompt,omitempty" json:"limit_mm_per_prompt,omitempty"`       // vLLM
+	MMProj               string           `yaml:"mmproj,omitempty" json:"mmproj,omitempty"`
 
-	FlashAttention *string `yaml:"flash_attention" json:"flash_attention"`
-	NoKVOffloading bool    `yaml:"no_kv_offloading" json:"no_kv_offloading"`
-	CacheTypeK     string  `yaml:"cache_type_k" json:"cache_type_k"`
-	CacheTypeV     string  `yaml:"cache_type_v" json:"cache_type_v"`
+	FlashAttention *string `yaml:"flash_attention,omitempty" json:"flash_attention,omitempty"`
+	NoKVOffloading bool    `yaml:"no_kv_offloading,omitempty" json:"no_kv_offloading,omitempty"`
+	CacheTypeK     string  `yaml:"cache_type_k,omitempty" json:"cache_type_k,omitempty"`
+	CacheTypeV     string  `yaml:"cache_type_v,omitempty" json:"cache_type_v,omitempty"`
 
-	RopeScaling string `yaml:"rope_scaling" json:"rope_scaling"`
-	ModelType   string `yaml:"type" json:"type"`
+	RopeScaling string `yaml:"rope_scaling,omitempty" json:"rope_scaling,omitempty"`
+	ModelType   string `yaml:"type,omitempty" json:"type,omitempty"`
 
-	YarnExtFactor  float32 `yaml:"yarn_ext_factor" json:"yarn_ext_factor"`
-	YarnAttnFactor float32 `yaml:"yarn_attn_factor" json:"yarn_attn_factor"`
-	YarnBetaFast   float32 `yaml:"yarn_beta_fast" json:"yarn_beta_fast"`
-	YarnBetaSlow   float32 `yaml:"yarn_beta_slow" json:"yarn_beta_slow"`
+	YarnExtFactor  float32 `yaml:"yarn_ext_factor,omitempty" json:"yarn_ext_factor,omitempty"`
+	YarnAttnFactor float32 `yaml:"yarn_attn_factor,omitempty" json:"yarn_attn_factor,omitempty"`
+	YarnBetaFast   float32 `yaml:"yarn_beta_fast,omitempty" json:"yarn_beta_fast,omitempty"`
+	YarnBetaSlow   float32 `yaml:"yarn_beta_slow,omitempty" json:"yarn_beta_slow,omitempty"`
 
-	CFGScale float32 `yaml:"cfg_scale" json:"cfg_scale"` // Classifier-Free Guidance Scale
+	CFGScale float32 `yaml:"cfg_scale,omitempty" json:"cfg_scale,omitempty"` // Classifier-Free Guidance Scale
 }
 
-// LimitMMPerPrompt is a struct that holds the configuration for the limit-mm-per-prompt config in vLLM
+// @Description LimitMMPerPrompt is a struct that holds the configuration for the limit-mm-per-prompt config in vLLM
 type LimitMMPerPrompt struct {
-	LimitImagePerPrompt int `yaml:"image" json:"image"`
-	LimitVideoPerPrompt int `yaml:"video" json:"video"`
-	LimitAudioPerPrompt int `yaml:"audio" json:"audio"`
+	LimitImagePerPrompt int `yaml:"image,omitempty" json:"image,omitempty"`
+	LimitVideoPerPrompt int `yaml:"video,omitempty" json:"video,omitempty"`
+	LimitAudioPerPrompt int `yaml:"audio,omitempty" json:"audio,omitempty"`
 }
 
-// TemplateConfig is a struct that holds the configuration of the templating system
+// @Description TemplateConfig is a struct that holds the configuration of the templating system
 type TemplateConfig struct {
 	// Chat is the template used in the chat completion endpoint
-	Chat string `yaml:"chat" json:"chat"`
+	Chat string `yaml:"chat,omitempty" json:"chat,omitempty"`
 
 	// ChatMessage is the template used for chat messages
-	ChatMessage string `yaml:"chat_message" json:"chat_message"`
+	ChatMessage string `yaml:"chat_message,omitempty" json:"chat_message,omitempty"`
 
 	// Completion is the template used for completion requests
-	Completion string `yaml:"completion" json:"completion"`
+	Completion string `yaml:"completion,omitempty" json:"completion,omitempty"`
 
 	// Edit is the template used for edit completion requests
-	Edit string `yaml:"edit" json:"edit"`
+	Edit string `yaml:"edit,omitempty" json:"edit,omitempty"`
 
 	// Functions is the template used when tools are present in the client requests
-	Functions string `yaml:"function" json:"function"`
+	Functions string `yaml:"function,omitempty" json:"function,omitempty"`
 
 	// UseTokenizerTemplate is a flag that indicates if the tokenizer template should be used.
 	// Note: this is mostly consumed for backends such as vllm and transformers
 	// that can use the tokenizers specified in the JSON config files of the models
-	UseTokenizerTemplate bool `yaml:"use_tokenizer_template" json:"use_tokenizer_template"`
+	UseTokenizerTemplate bool `yaml:"use_tokenizer_template,omitempty" json:"use_tokenizer_template,omitempty"`
 
 	// JoinChatMessagesByCharacter is a string that will be used to join chat messages together.
 	// It defaults to \n
-	JoinChatMessagesByCharacter *string `yaml:"join_chat_messages_by_character" json:"join_chat_messages_by_character"`
+	JoinChatMessagesByCharacter *string `yaml:"join_chat_messages_by_character,omitempty" json:"join_chat_messages_by_character,omitempty"`
 
-	Multimodal string `yaml:"multimodal" json:"multimodal"`
+	Multimodal string `yaml:"multimodal,omitempty" json:"multimodal,omitempty"`
 
-	JinjaTemplate bool `yaml:"jinja_template" json:"jinja_template"`
+	ReplyPrefix string `yaml:"reply_prefix,omitempty" json:"reply_prefix,omitempty"`
+}
 
-	ReplyPrefix string `yaml:"reply_prefix" json:"reply_prefix"`
+func (c *ModelConfig) syncKnownUsecasesFromString() {
+	c.KnownUsecases = GetUsecasesFromYAML(c.KnownUsecaseStrings)
+	// Make sure the usecases are valid, we rewrite with what we identified
+	c.KnownUsecaseStrings = []string{}
+	for k, usecase := range GetAllModelConfigUsecases() {
+		if c.HasUsecases(usecase) {
+			c.KnownUsecaseStrings = append(c.KnownUsecaseStrings, k)
+		}
+	}
 }
 
 func (c *ModelConfig) UnmarshalYAML(value *yaml.Node) error {
@@ -279,14 +296,7 @@ func (c *ModelConfig) UnmarshalYAML(value *yaml.Node) error {
 	}
 	*c = ModelConfig(aux)
 
-	c.KnownUsecases = GetUsecasesFromYAML(c.KnownUsecaseStrings)
-	// Make sure the usecases are valid, we rewrite with what we identified
-	c.KnownUsecaseStrings = []string{}
-	for k, usecase := range GetAllModelConfigUsecases() {
-		if c.HasUsecases(usecase) {
-			c.KnownUsecaseStrings = append(c.KnownUsecaseStrings, k)
-		}
-	}
+	c.syncKnownUsecasesFromString()
 	return nil
 }
 
@@ -463,9 +473,10 @@ func (cfg *ModelConfig) SetDefaults(opts ...ConfigLoaderOption) {
 	}
 
 	guessDefaultsFromFile(cfg, lo.modelPath, ctx)
+	cfg.syncKnownUsecasesFromString()
 }
 
-func (c *ModelConfig) Validate() bool {
+func (c *ModelConfig) Validate() (bool, error) {
 	downloadedFileNames := []string{}
 	for _, f := range c.DownloadFiles {
 		downloadedFileNames = append(downloadedFileNames, f.Filename)
@@ -479,21 +490,24 @@ func (c *ModelConfig) Validate() bool {
 		}
 		if strings.HasPrefix(n, string(os.PathSeparator)) ||
 			strings.Contains(n, "..") {
-			return false
+			return false, fmt.Errorf("invalid file path: %s", n)
 		}
 	}
 
 	if c.Backend != "" {
 		// a regex that checks that is a string name with no special characters, except '-' and '_'
 		re := regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
-		return re.MatchString(c.Backend)
+		if !re.MatchString(c.Backend) {
+			return false, fmt.Errorf("invalid backend name: %s", c.Backend)
+		}
+		return true, nil
 	}
 
-	return true
+	return true, nil
 }
 
 func (c *ModelConfig) HasTemplate() bool {
-	return c.TemplateConfig.Completion != "" || c.TemplateConfig.Edit != "" || c.TemplateConfig.Chat != "" || c.TemplateConfig.ChatMessage != ""
+	return c.TemplateConfig.Completion != "" || c.TemplateConfig.Edit != "" || c.TemplateConfig.Chat != "" || c.TemplateConfig.ChatMessage != "" || c.TemplateConfig.UseTokenizerTemplate
 }
 
 func (c *ModelConfig) GetModelConfigFile() string {
@@ -524,7 +538,8 @@ const (
 
 func GetAllModelConfigUsecases() map[string]ModelConfigUsecases {
 	return map[string]ModelConfigUsecases{
-		"FLAG_ANY":              FLAG_ANY,
+		// Note: FLAG_ANY is intentionally excluded from this map
+		// because it's 0 and would always match in HasUsecases checks
 		"FLAG_CHAT":             FLAG_CHAT,
 		"FLAG_COMPLETION":       FLAG_COMPLETION,
 		"FLAG_EDIT":             FLAG_EDIT,
@@ -574,7 +589,7 @@ func (c *ModelConfig) HasUsecases(u ModelConfigUsecases) bool {
 // This avoids the maintenance burden of updating this list for each new backend - but unfortunately, that's the best option for some services currently.
 func (c *ModelConfig) GuessUsecases(u ModelConfigUsecases) bool {
 	if (u & FLAG_CHAT) == FLAG_CHAT {
-		if c.TemplateConfig.Chat == "" && c.TemplateConfig.ChatMessage == "" {
+		if c.TemplateConfig.Chat == "" && c.TemplateConfig.ChatMessage == "" && !c.TemplateConfig.UseTokenizerTemplate {
 			return false
 		}
 	}
@@ -626,7 +641,7 @@ func (c *ModelConfig) GuessUsecases(u ModelConfigUsecases) bool {
 		}
 	}
 	if (u & FLAG_TTS) == FLAG_TTS {
-		ttsBackends := []string{"bark-cpp", "piper", "transformers-musicgen"}
+		ttsBackends := []string{"bark-cpp", "piper", "transformers-musicgen", "kokoro"}
 		if !slices.Contains(ttsBackends, c.Backend) {
 			return false
 		}
@@ -658,4 +673,41 @@ func (c *ModelConfig) GuessUsecases(u ModelConfigUsecases) bool {
 	}
 
 	return true
+}
+
+// BuildCogitoOptions generates cogito options from the model configuration
+// It accepts a context, MCP sessions, and optional callback functions for status, reasoning, tool calls, and tool results
+func (c *ModelConfig) BuildCogitoOptions() []cogito.Option {
+	cogitoOpts := []cogito.Option{
+		cogito.WithIterations(3),  // default to 3 iterations
+		cogito.WithMaxAttempts(3), // default to 3 attempts
+		cogito.WithForceReasoning(),
+	}
+
+	// Apply agent configuration options
+	if c.Agent.EnableReasoning {
+		cogitoOpts = append(cogitoOpts, cogito.EnableToolReasoner)
+	}
+
+	if c.Agent.EnablePlanning {
+		cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlan)
+	}
+
+	if c.Agent.EnableMCPPrompts {
+		cogitoOpts = append(cogitoOpts, cogito.EnableMCPPrompts)
+	}
+
+	if c.Agent.EnablePlanReEvaluator {
+		cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
+	}
+
+	if c.Agent.MaxIterations != 0 {
+		cogitoOpts = append(cogitoOpts, cogito.WithIterations(c.Agent.MaxIterations))
+	}
+
+	if c.Agent.MaxAttempts != 0 {
+		cogitoOpts = append(cogitoOpts, cogito.WithMaxAttempts(c.Agent.MaxAttempts))
+	}
+
+	return cogitoOpts
 }
