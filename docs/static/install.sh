@@ -363,7 +363,7 @@ install_container_toolkit_apt() {
     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
     $SUDO tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
-    $SUDO sudo apt-get update && $SUDO apt-get install -y nvidia-container-toolkit
+    $SUDO apt-get update && $SUDO apt-get install -y nvidia-container-toolkit
 }
 
 # ref: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installing-with-zypper
@@ -877,6 +877,16 @@ if [ "$OS" = "Darwin" ]; then
     exit 0
 fi
 
+SUDO=
+if [ "$(id -u)" -ne 0 ]; then
+    # Running as root, no need for sudo
+    if ! available sudo; then
+        fatal "This script requires superuser permissions. Please re-run as root."
+    fi
+
+    SUDO="sudo"
+fi
+
 if check_gpu lspci amdgpu || check_gpu lshw amdgpu; then
     HAS_AMD=true
 fi
@@ -887,16 +897,6 @@ fi
 
 if check_gpu lspci intel || check_gpu lshw intel; then
     HAS_INTEL=true
-fi
-
-SUDO=
-if [ "$(id -u)" -ne 0 ]; then
-    # Running as root, no need for sudo
-    if ! available sudo; then
-        fatal "This script requires superuser permissions. Please re-run as root."
-    fi
-
-    SUDO="sudo"
 fi
 
 PACKAGE_MANAGER=
