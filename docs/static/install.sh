@@ -137,15 +137,10 @@ uninstall_localai() {
         fi
     done
 
-    # Remove models directory
-    if [ -d "/var/lib/local-ai" ]; then
-        info "Removing LocalAI data directory..."
-        $SUDO rm -rf /var/lib/local-ai
-    fi
-
-    # Remove local-ai user if it exists
+    # Remove local-ai user and all its data if it exists
     if id local-ai >/dev/null 2>&1; then
-        info "Removing local-ai user..."
+        info "Removing local-ai user and all its data..."
+        $SUDO gpasswd -d $(whoami) local-ai
         $SUDO userdel -r local-ai || true
     fi
 
@@ -232,7 +227,10 @@ trap aborted INT
 configure_systemd() {
     if ! id local-ai >/dev/null 2>&1; then
         info "Creating local-ai user..."
-        $SUDO useradd -r -s /bin/false -U -m -d /var/lib/local-ai local-ai
+        $SUDO useradd -r -s /bin/false -U -M -d /var/lib/local-ai local-ai
+        $SUDO mkdir -p /var/lib/local-ai
+        $SUDO chmod 0755 /var/lib/local-ai
+        $SUDO chown local-ai:local-ai /var/lib/local-ai
     fi
 
     info "Adding current user to local-ai group..."
@@ -358,9 +356,8 @@ enable_selinux_container_booleans() {
 install_container_toolkit_apt() {
     info 'Installing NVIDIA container toolkit repository...'
 
-    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | $SUDO gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | $SUDO gpg --dearmor -o /etc/apt/trusted.gpg.d/nvidia-container-toolkit-keyring.gpg \
   && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
     $SUDO tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
     $SUDO apt-get update && $SUDO apt-get install -y nvidia-container-toolkit
